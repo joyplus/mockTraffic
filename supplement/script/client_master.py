@@ -132,7 +132,7 @@ class ClientMaster(BaseScript):
 
     def save_client(self, client, info):
         client.mac = client.mac or info["mac"]
-        client.mac_md5 = client.ip or info["mac_md5"]
+        client.mac_md5 = client.mac_md5 or info["mac_md5"]
         client.ip = client.ip or info["ip"]
         client.province_code = client.province_code or info["province_code"]
         client.city_code = client.city_code or info["city_code"]
