@@ -7,7 +7,6 @@ from utils.mac_builder import generate as get_mac, mac_md5 as get_mac_md5
 from utils.ip_taobao import get_ip_info
 from script import BaseScript
 from models.client_master import ClientMasterModel
-from models.ip_region_master import IpRegionMasterModel
 import random
 
 
