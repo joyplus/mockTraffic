@@ -102,10 +102,13 @@ class SendRequestScript(BaseScript):
             #result = urllib2.urlopen(url ,data).read()
             result = urllib2.urlopen(url.format(mac=params["mac_md5"], ip=params["ip"])).read()
 
+            now = datetime.datetime.now()
             self.result_queue.put(
                 #json.dumps(dict(result=self.json_loads(result), id=params["id"])))
-                json.dumps(dict(result=result, id=params["id"])))
-            self.logger.debug("worker work hard for %d" % params["id"])
+                json.dumps(dict(result=result,
+                                id=params["plan_id"],
+                                finished_time=self.datetime2str(now))))
+            self.logger.debug("worker work hard for %d" % params["plan_id"])
 
             task = self.jobs_queue.get()
             #return urllib2.urlopen(url, data).read()
@@ -113,6 +116,9 @@ class SendRequestScript(BaseScript):
     def str2datetime(self, value):
 
         return datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+
+    def datetime2str(self, value):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
 
     def json_loads(self, value):
         return json.loads(value)

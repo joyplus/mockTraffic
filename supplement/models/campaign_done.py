@@ -17,4 +17,4 @@ class CampaignDoneModel(BaseModel):
         return "<CampaignDoneModel: %r>" % self.id
 
     class Meta:
-        db_table = "bl_campaign_master"
+        db_table = "bl_campaign_done"

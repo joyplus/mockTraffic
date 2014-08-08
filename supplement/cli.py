@@ -10,6 +10,7 @@ from script.cal_impression import CalculatorScript
 from script.allot_day_client import AllotDayClientScript
 from script.put2queue import PutToQueue
 from script.send_request import SendRequestScript
+from script.get_result import GetResultScript
 from time import time
 from logbook import RotatingFileHandler, NullHandler, StreamHandler
 
@@ -21,10 +22,14 @@ scripts = {
         "allot_day_client": AllotDayClientScript,
         "put2queue": PutToQueue,
         "send_request": SendRequestScript,
+        "get_result": GetResultScript,
         }
 
 
 script = ""
+if len(sys.argv) > 1:
+    script = sys.argv[1]
+
 def main():
     if len(sys.argv) > 1:
         script = sys.argv[1]
