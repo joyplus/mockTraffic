@@ -1,5 +1,7 @@
+Logbook==0.7.0
 PyMySQL==0.6.2
+PyYAML==3.11
+beanstalkc==0.4.0
 gevent==1.0.1
 greenlet==0.4.2
 peewee==2.2.5
-six==1.7.3

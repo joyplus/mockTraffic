@@ -12,6 +12,7 @@ import random
 
 class ClientMaster(BaseScript):
     province_code_total = 32
+    gevent_task_nums = 10
 
     def __init__(self, province_code=None, init_total=20000, update_percent=20):
         self.total = init_total
@@ -28,11 +29,14 @@ class ClientMaster(BaseScript):
         if len(args) == 2:
             self.province_code = args[1]
 
-        if current_task == "init":
+        if current_task == "init" or current_task == "init_gevent":
             if len(args) == 3:
                 self.province_code = args[1]
                 self.total = int(args[2])
-            self.init()
+            if current_task == "init":
+                self.init()
+            else:
+                self.init_gevent()
         else:
             if len(args) == 3:
                 self.province_code = args[1]
@@ -90,6 +94,33 @@ class ClientMaster(BaseScript):
             self.logger.debug(info)
             count += 1
 
+    def init_gevent(self):
+        import gevent
+        from gevent import monkey
+        from gevent.queue import Queue
+        monkey.patch_socket()
+
+        self.tasks = Queue()
+        gevent.spawn(self.boss).join()
+        jobs = [self.worker for i in xrange(self.gevent_task_nums)]
+        gevent.joinall([gevent.spawn(worker) for worker in jobs])
+
+    def boss(self):
+        for i in xrange(0, self.total):
+            self.tasks.put_nowait(i)
+
+    def worker(self):
+        while not self.tasks.empty():
+            task = self.tasks.get()
+
+            info = self.get_client_info()
+            while not info:
+                info = self.get_client_info()
+            client = self.get_client(info["mac_md5"])
+            self.save_client(client, info)
+            self.logger.debug(info)
+
+
     def get_client_info(self):
         if self.province_code:
             province_code = self.province_code
@@ -97,8 +128,10 @@ class ClientMaster(BaseScript):
             province_code = self.get_province_code()
         ip = get_ip(province_code)
         ip_info = get_ip_info(ip)
-        if ip_info["code"] != 0 or not ip_info["data"]["city"]:
+        if ip_info["code"] != 0:
             return None
+        if not ip_info["data"]["city"]:
+            ip_info["data"]["city"] = ""
         city = find_city(ip_info["data"]["city"])
         if not city:
             return None

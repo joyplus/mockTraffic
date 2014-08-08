@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 
-from peewee import DateTimeFiled, IntegerField
+from peewee import DateTimeField, IntegerField
 from models.base import BaseModel
 from models.client_master import ClientMasterModel
 from lib import logger
@@ -13,7 +13,7 @@ class CampaignPlanModel(BaseModel):
     id = IntegerField(primary_key=True)
     impression_master_id = IntegerField()
     client_master_id = IntegerField()
-    campaign_date = DateTimeFiled()
+    campaign_date = DateTimeField()
 
     def __repr__(self):
         return "<CampaignPlanModel: %r>" % self.id

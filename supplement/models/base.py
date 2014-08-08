@@ -7,4 +7,4 @@ from peewee import Model
 class BaseModel(Model):
 
     class Meta:
-        database = db
+        database = db()
