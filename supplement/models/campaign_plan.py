@@ -14,6 +14,7 @@ class CampaignPlanModel(BaseModel):
     impression_master_id = IntegerField()
     client_master_id = IntegerField()
     campaign_date = DateTimeField()
+    status = IntegerField()
 
     def __repr__(self):
         return "<CampaignPlanModel: %r>" % self.id

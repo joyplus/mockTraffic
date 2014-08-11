@@ -86,10 +86,12 @@ class AllotPlanScript(BaseScript):
                         use_index.append(client_index)
 
                         client = CampaignClientModel.get(CampaignClientModel.id == campaign_client_id)
-                        if client.actual_fre <= 0:
+                        if client.plan_impression <= 0:
+                            continue
+                        if client.actual_plan_impression <= 0:
                             continue
 
-                        client.impression_fre -= 1
+                        client.actual_plan_impression -= 1
                         client.save()
                         plan = CampaignPlanModel(impression_master_id=self.im_id,
                                                  client_master_id=client.client_id,

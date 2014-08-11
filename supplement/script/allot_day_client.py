@@ -42,18 +42,6 @@ class AllotDayClientScript(BaseScript):
 
         # 第一天
         day_first = self.day_im[0]
-        #total_clients = day_first.client
-        #for region in self.region_rate:
-            #nums = region.rate * total_clients / 100
-            #nums = int(round(nums))
-            #t = 0
-            #clients = ClientMasterModel.select().\
-                #where(ClientMasterModel.province_code == region.targeting_code).\
-                #order_by(fn.Rand()).limit(nums)
-            #for client in clients:
-                #t += 1
-            #print t, nums, region.targeting_code
-            #break
 
         total_client = day_first.client
         clients = self.get_clients(total_client)
@@ -67,8 +55,8 @@ class AllotDayClientScript(BaseScript):
                 for j in client[start:end]:
                      CampaignClientModel(day_impression_id=day_first.id,
                                          client_id=j.id,
-                                         impression_fre=i,
-                                         actual_fre=i).\
+                                         actual_plan_impression=i,
+                                         plan_impression=i).\
                          save()
                 start = end
 
@@ -76,7 +64,7 @@ class AllotDayClientScript(BaseScript):
         day_left = self.day_im[1:]
         # 复制第一天的 client 的 80% 到其他天
         for day in day_left:
-            CampaignClientModel.raw("insert into bl_campaign_client(day_impression_id, client_id, actual_fre) select %d as day_impression_id, client_id, -1 as actual_fre from bl_campaign_client where bl_campaign_client.day_impression_id = %d;" % (day.id, day_first.id)).\
+            CampaignClientModel.raw("insert into bl_campaign_client(day_impression_id, client_id, plan_impression) select %d as day_impression_id, client_id, -1 as plan_impression from bl_campaign_client where bl_campaign_client.day_impression_id = %d;" % (day.id, day_first.id)).\
                 execute()
 
         region_sql = """
@@ -116,7 +104,7 @@ class AllotDayClientScript(BaseScript):
                         addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
                                                                                    targeting_code=region.targeting_code,
                                                                                    nums=diff)).execute()
-                    elif nums < regions[region.targeting_code]: # 量过了，不删，actual_fre 为 0 即不使用
+                    elif nums < regions[region.targeting_code]: # 量过了，不删，plan_impression 为 0 即不使用
                         pass
 
                 else: # 没有此地区，增加
@@ -131,7 +119,7 @@ class AllotDayClientScript(BaseScript):
                         addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
                                                                                    targeting_code=region.targeting_code,
                                                                                    nums=nums)).execute()
-        # 设置剩余天数的 impression_fre
+        # 设置剩余天数的 actual_plan_impression
         for day in day_left:
             region_client_sql = """
             select t1.* from bl_campaign_client as t1
@@ -161,20 +149,20 @@ class AllotDayClientScript(BaseScript):
                     end = int(round(client_rate_num)) + start
                     for j in client[start:end]:
                             c = CampaignClientModel.get(CampaignClientModel.id == j[0])
-                            c.impression_fre = i
-                            c.actual_fre = i
+                            c.actual_plan_impression = i
+                            c.plan_impression = i
                             c.save()
                     start = end
 
         # 更新 day_impression 的 impression
         for day in self.day_im:
             #count = CampaignClientModel.select().\
-                #where(CampaignClientModel.day_impression_id == day.id, CampaignClientModel.actual_fre > 0).\
+                #where(CampaignClientModel.day_impression_id == day.id, CampaignClientModel.plan_impression > 0).\
                 #count()
             sql = """
             update bl_day_impression\
             set impression =\
-            (select sum(actual_fre) from `bl_campaign_client` where day_impression_id = {day_im_id})\
+            (select sum(plan_impression) from `bl_campaign_client` where day_impression_id = {day_im_id})\
             where id = {day_im_id};
             """
             #day.impression = count
@@ -205,7 +193,7 @@ class AllotDayClientScript(BaseScript):
                 # clients.append(client)
                 CampaignClientModel(day_impression_id=day_im_id,
                                     client_id=client.id,
-                                    impression_fre=0).\
+                                    actual_plan_impression=0).\
                     save()
             else:
                 try_temp += 1

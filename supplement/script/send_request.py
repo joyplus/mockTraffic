@@ -5,6 +5,7 @@
 from script import BaseScript
 from lib import get_campaign_plan_queue, get_queue, config
 from models.impression_master import ImpressionMasterModel
+from models.campaign_plan import CampaignPlanModel
 import json
 import datetime
 import urllib2
@@ -40,7 +41,7 @@ class SendRequestScript(BaseScript):
             self.logger.warning("[AllocationScript]: no impression_master")
             return None
 
-        #self.boss()
+        # self.boss()
         self.jobs_queue = Queue(maxsize=4)
 
         gevent.joinall([
@@ -50,7 +51,6 @@ class SendRequestScript(BaseScript):
             gevent.spawn(self.worker),
             gevent.spawn(self.worker),
         ])
-
 
     def get_time(self, value):
         year, month, day, hour, minute, second = value.year, value.month, value.day, value.hour, value.minute, value.second
@@ -66,52 +66,59 @@ class SendRequestScript(BaseScript):
             now = datetime.datetime.now()
 
             # 一小时之内的 paln 可以执行
-            now_hour = datetime.datetime(now.year, now.month, now.day, now.hour)
+            now_hour = datetime.datetime(
+                now.year, now.month, now.day, now.hour)
             value_now_hour = datetime.datetime(value["campaign_date"].year, value[
-                                          "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
-            if now_hour > value_now_hour:
-                #print "wait", now, value["campaign_date"]
-                #print "pass"
-                job.delete()
-                job = self.campaign_paln_queue.reserve(timeout=0)
-                continue
+                "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
+            #if now_hour > value_now_hour:
+                ## print "wait", now, value["campaign_date"]
+                ## print "pass"
+                #job.delete()
+                #job = self.campaign_paln_queue.reserve(timeout=0)
+                #continue
 
             # TODO: 清除上个小时未执行完的任务
 
-            if now < value["campaign_date"]:
-                #print "wait", now, value["campaign_date"]
-                self.logger.info("wait")#, now, value["campaign_date"])
-                continue
+            #if now < value["campaign_date"]:
+                ## print "wait", now, value["campaign_date"]
+                #self.logger.info("wait")  # , now, value["campaign_date"])
+                #continue
 
             task = self.im.tracking_url_1, value
             self.jobs_queue.put(task)
 
             #result = self.worker(task)
 
-            #self.result_queue.put(
-                #json.dumps(dict(result=result, id=value["id"])))
+            # self.result_queue.put(
+            # json.dumps(dict(result=result, id=value["id"])))
             job.delete()
             job = self.campaign_paln_queue.reserve(timeout=0)
 
-
     def worker(self):
-        task = self.jobs_queue.get() # block wait for a job
+        task = self.jobs_queue.get()  # block wait for a job
         while task:
             url, params = task
             #data = urlencode(params)
             #result = urllib2.urlopen(url ,data).read()
-            result = urllib2.urlopen(url.format(mac=params["mac_md5"], ip=params["ip"])).read()
+            try:
+                urllib2.urlopen(
+                    url.format(mac=params["mac_md5"], ip=params["ip"])).read()
+                CampaignPlanModel.raw(
+                    "UPDATE bl_campaign_plan set status=1 where id={}".format(params["plan_id"])).\
+                    execute()
+            except (urllib2.URLError, urllib2.HTTPError) as e:
+                self.logger.error("send_request error, task: %r, exception: %r" % (params, e))
 
-            now = datetime.datetime.now()
-            self.result_queue.put(
-                #json.dumps(dict(result=self.json_loads(result), id=params["id"])))
-                json.dumps(dict(result=result,
-                                id=params["plan_id"],
-                                finished_time=self.datetime2str(now))))
+            #now = datetime.datetime.now()
+            # self.result_queue.put(
+            # json.dumps(dict(result=self.json_loads(result), id=params["id"])))
+            # json.dumps(dict(result=result,
+            # id=params["plan_id"],
+            # finished_time=self.datetime2str(now))))
             self.logger.debug("worker work hard for %d" % params["plan_id"])
 
             task = self.jobs_queue.get()
-            #return urllib2.urlopen(url, data).read()
+            # return urllib2.urlopen(url, data).read()
 
     def str2datetime(self, value):
 
