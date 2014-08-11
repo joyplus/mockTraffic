@@ -5,12 +5,14 @@
 from models.client_master import ClientMasterModel
 from models.impression_allocation import ImpressionAllocationModel
 from models.day_impression import DayImpressionModel
+from models.exception_continue import ExceptionContinueModel
 from models.impression_master import ImpressionMasterModel
 from models.rate_allocation import RateAllocationModel
 from models.campaign_client import CampaignClientModel
 from models.campaign_plan import CampaignPlanModel
 from script import BaseScript
 import random
+import pdb
 
 
 class AllotPlanScript(BaseScript):
@@ -53,54 +55,79 @@ class AllotPlanScript(BaseScript):
 
             for hour in self.clock_rate: # 每一小时的投放量
                 for region in self.region_rate: # 每一地区的这一小时的投放量
-                    sql = """
-                    SELECT t1.* FROM `bl_campaign_client` as t1
-                    left join `bl_client_master` as t2 on t2.id = t1.client_id
-                    where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
-                    """
-                    clients = CampaignClientModel.raw(sql.format(day_im_id=day.id,
-                                                                 targeting_code=region.targeting_code)).execute()
-                    clients = clients.cursor.fetchall()
-                    clients_count = len(clients)
-                    use_index = list()
+                    try:
+                        ExceptionContinueModel.get(day_impression_id=day.id,
+                                                   type="allot_plan",
+                                                   targeting_code=region.targeting_code,
+                                                   hour=hour.targeting_code)
+                        self.logger.debug(u"已经分配了 plan, %s, %s, %s" % (day.date,
+                                                                           hour.targeting_code,
+                                                                           region.targeting_code))
+                        continue
+                    except ExceptionContinueModel.DoesNotExist:
+                        self.logger.debug(u"未分配 plan, %s, %s, %s" % (day.date,
+                                                                           hour.targeting_code,
+                                                                           region.targeting_code))
+                        sql = """
+                        SELECT t1.* FROM `bl_campaign_client` as t1
+                        left join `bl_client_master` as t2 on t2.id = t1.client_id
+                        where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
+                        """
+                        clients = CampaignClientModel.raw(sql.format(day_im_id=day.id,
+                                                                    targeting_code=region.targeting_code)).execute()
+                        clients = clients.cursor.fetchall()
+                        clients_count = len(clients)
+                        use_index = list()
 
-                    single_bit_impression = impression * hour.rate / 100
-                    single_bit_impression = round(single_bit_impression) * region.rate / 100
-                    single_bit_impression = int(round(single_bit_impression))
+                        single_bit_impression = impression * hour.rate / 100
+                        single_bit_impression = round(single_bit_impression) * region.rate / 100
+                        single_bit_impression = int(round(single_bit_impression))
 
-                    single_bit_client = client_num * hour.rate / 100
-                    single_bit_client = round(single_bit_client) * region.rate / 100
-                    single_bit_client = int(round(single_bit_client))
-                    #print "region: %r" % region.targeting_code,
-                    #print single_bit_impression, single_bit_client
-                    #print "campaign time", day.date, hour.targeting_code, len(clients)
-                    while single_bit_impression > 0:
-                        client_index = random.randint(0, clients_count-1)
+                        single_bit_client = client_num * hour.rate / 100
+                        single_bit_client = round(single_bit_client) * region.rate / 100
+                        single_bit_client = int(round(single_bit_client))
+                        #print "region: %r" % region.targeting_code,
+                        #print single_bit_impression, single_bit_client
+                        #print "campaign time", day.date, hour.targeting_code, len(clients)
+                        nums = single_bit_impression
+                        while single_bit_impression > 0:
+                            client_index = random.randint(0, clients_count-1)
 
-                        if client_index in use_index:
-                            continue
-                        if not clients[client_index]:
-                            continue
+                            if client_index in use_index:
+                                if len(use_index) == len(clients):
+                                    break
+                                continue
+                            if not clients[client_index]:
+                                continue
 
-                        campaign_client_id = clients[client_index][0]
-                        use_index.append(client_index)
+                            campaign_client_id = clients[client_index][0]
+                            use_index.append(client_index)
 
-                        client = CampaignClientModel.get(CampaignClientModel.id == campaign_client_id)
-                        if client.plan_impression <= 0:
-                            continue
-                        if client.actual_plan_impression <= 0:
-                            continue
+                            client = CampaignClientModel.get(CampaignClientModel.id == campaign_client_id)
+                            if client.plan_impression <= 0:
+                                continue
 
-                        client.actual_plan_impression -= 1
-                        client.save()
-                        plan = CampaignPlanModel(impression_master_id=self.im_id,
-                                                 client_master_id=client.client_id,
-                                                 campaign_date="%s %s:%0.2d:%0.2d" % (day.date, hour.targeting_code, self.get_minute(), self.get_seconed())
-                                                 )
-                        plan.save()
+                            if client.actual_plan_impression <= 0:
+                                continue
 
+                            client.actual_plan_impression -= 1
+                            client.save()
+                            plan = CampaignPlanModel(impression_master_id=self.im_id,
+                                                    client_master_id=client.client_id,
+                                                    campaign_date="%s %s:%0.2d:%0.2d" % (day.date, hour.targeting_code, self.get_minute(), self.get_seconed())
+                                                    )
+                            plan.save()
 
-                        single_bit_impression -= 1
+                            single_bit_impression -= 1
+
+                        ExceptionContinueModel.create(day_impression_id=day.id,
+                                                      type="allot_plan",
+                                                      targeting_code=region.targeting_code,
+                                                      hour=hour.targeting_code,
+                                                      nums=nums)
+        for day in self.di:
+            # 任务执行完毕，清楚异常处理的记录
+            ExceptionContinueModel.delete().where(ExceptionContinueModel.day_impression_id==day.id)
 
 
 

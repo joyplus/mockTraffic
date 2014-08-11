@@ -10,6 +10,7 @@ from models.day_impression import DayImpressionModel
 from models.campaign_client import CampaignClientModel
 from models.client_master import ClientMasterModel
 from models.rate_allocation import RateAllocationModel
+from models.exception_continue import ExceptionContinueModel
 from script.cal_impression import CalculatorScript
 import random
 from peewee import fn
@@ -48,77 +49,97 @@ class AllotDayClientScript(BaseScript):
         for code, client, nums in clients:  # divide by region
             start = 0
             end = 0
-            for i, per in enumerate(self.client_rate):
-                client_rate_num = nums * float(per) / 100
-                #impression = round(client_rate_num * i)
-                end = int(round(client_rate_num)) + start
-                for j in client[start:end]:
-                     CampaignClientModel(day_impression_id=day_first.id,
-                                         client_id=j.id,
-                                         actual_plan_impression=i,
-                                         plan_impression=i).\
-                         save()
-                start = end
+            # 异常处理，continue
+            try: # 当异常处理表有记录时，表示已经执行过了
+                ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day_first.id,
+                                                    targeting_code=code,
+                                                    type="allot_day_client").nums
+                continue
+            except ExceptionContinueModel.DoesNotExist:
+                for i, per in enumerate(self.client_rate):
+                    client_rate_num = nums * float(per) / 100
+                    #impression = round(client_rate_num * i)
+                    end = int(round(client_rate_num)) + start
+                    for j in client[start:end]:
+                        CampaignClientModel(day_impression_id=day_first.id,
+                                            client_id=j.id,
+                                            actual_plan_impression=i,
+                                            plan_impression=i).\
+                            save()
+                    start = end
 
-        # 其他天
+                ExceptionContinueModel.create(day_impression_id=day_first.id,
+                                              type="allot_day_client",
+                                              targeting_code=code,
+                                              nums=nums).save()
+
+
         day_left = self.day_im[1:]
-        # 复制第一天的 client 的 80% 到其他天
-        for day in day_left:
-            CampaignClientModel.raw("insert into bl_campaign_client(day_impression_id, client_id, plan_impression) select %d as day_impression_id, client_id, -1 as plan_impression from bl_campaign_client where bl_campaign_client.day_impression_id = %d;" % (day.id, day_first.id)).\
-                execute()
+        try:
+            ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day_left[0].id,
+                                                type="allot_day_client")
+            self.logger.debug("已经分配过了")
+        except ExceptionContinueModel.DoesNotExist:
+            self.logger.debug("开始分配")
+            # 其他天
+            # 复制第一天的 client 的 80% 到其他天
+            for day in day_left:
+                CampaignClientModel.raw("insert into bl_campaign_client(day_impression_id, client_id, plan_impression) select %d as day_impression_id, client_id, -1 as plan_impression from bl_campaign_client where bl_campaign_client.day_impression_id = %d;" % (day.id, day_first.id)).\
+                    execute()
 
-        region_sql = """
-        SELECT t2.province_code as region_code, count(t2.province_code) as nums FROM `bl_campaign_client` as t1
-        left join `bl_client_master` as t2
-        on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
-        group by t2.province_code order by t2.province_code;
-        """
-        for day in day_left:
-            count = CampaignClientModel.select().\
-                where(CampaignClientModel.day_impression_id == day.id).\
-                count()
-            # 去除第一天里 20% 的client
-            rv = CampaignClientModel.raw("delete from bl_campaign_client where day_impression_id = %d order by rand() limit %d" % (day.id, int(0.2 * count))).\
-                execute()
-            # 去除后的 client，如果当日各个地区的大于则去除，小于则补充
-            rv = CampaignClientModel.raw(region_sql.format(day_impression_id=day.id)).execute()
-            regions = dict()
-            for i in rv:
-                regions[i.region_code] = i.nums
+            region_sql = """
+            SELECT t2.province_code as region_code, count(t2.province_code) as nums FROM `bl_campaign_client` as t1
+            left join `bl_client_master` as t2
+            on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
+            group by t2.province_code order by t2.province_code;
+            """
+            for day in day_left:
+                count = CampaignClientModel.select().\
+                    where(CampaignClientModel.day_impression_id == day.id).\
+                    count()
+                # 去除第一天里 20% 的client
+                rv = CampaignClientModel.raw("delete from bl_campaign_client where day_impression_id = %d order by rand() limit %d" % (day.id, int(0.2 * count))).\
+                    execute()
+                # 去除后的 client，如果当日各个地区的大于则去除，小于则补充
+                rv = CampaignClientModel.raw(region_sql.format(day_impression_id=day.id)).execute()
+                regions = dict()
+                for i in rv:
+                    regions[i.region_code] = i.nums
 
-            total_client = day.client
-            for region in self.region_rate:
-                nums = region.rate * total_client / 100
-                nums = int(round(nums))
-                if regions.get(region.targeting_code):
-                    if nums > regions[region.targeting_code]: # 量不足
-                        diff = nums - regions[region.targeting_code]
+                total_client = day.client
+                for region in self.region_rate:
+                    nums = region.rate * total_client / 100
+                    nums = int(round(nums))
+                    if regions.get(region.targeting_code):
+                        if nums > regions[region.targeting_code]: # 量不足
+                            diff = nums - regions[region.targeting_code]
 
-                        addtion_sql = """
-                        insert into bl_campaign_client(client_id, day_impression_id)
-                        select t1.id, {day_im_id} as day_imression_id from bl_client_master as t1
-                        left join bl_campaign_client as t2 on t1.id = t2.client_id
-                        where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
-                        """
-                        # 补充，TODO 未随机
-                        addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
-                                                                                   targeting_code=region.targeting_code,
-                                                                                   nums=diff)).execute()
-                    elif nums < regions[region.targeting_code]: # 量过了，不删，plan_impression 为 0 即不使用
-                        pass
+                            addtion_sql = """
+                            insert into bl_campaign_client(client_id, day_impression_id)
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            left join bl_campaign_client as t2 on t1.id = t2.client_id
+                            where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
+                            """
+                            # 补充，TODO 未随机
+                            addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
+                                                                                    targeting_code=region.targeting_code,
+                                                                                    nums=diff)).execute()
+                        elif nums < regions[region.targeting_code]: # 量过了，不删，plan_impression 为 0 即不使用
+                            pass
 
-                else: # 没有此地区，增加
-                    if nums > 0:
-                        addtion_sql = """
-                        insert into bl_campaign_client(client_id, day_impression_id)
-                        select t1.id, {day_im_id} as day_imression_id from bl_client_master as t1
-                        left join bl_campaign_client as t2 on t1.id = t2.client_id
-                        where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
-                        """
-                        # 补充，TODO 未随机
-                        addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
-                                                                                   targeting_code=region.targeting_code,
-                                                                                   nums=nums)).execute()
+                    else: # 没有此地区，增加
+                        if nums > 0:
+                            addtion_sql = """
+                            insert into bl_campaign_client(client_id, day_impression_id)
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            left join bl_campaign_client as t2 on t1.id = t2.client_id
+                            where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
+                            """
+                            # 补充，TODO 未随机
+                            addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
+                                                                                    targeting_code=region.targeting_code,
+                                                                                    nums=nums)).execute()
+        self.logger.debug("开始设置剩余天数的频次")
         # 设置剩余天数的 actual_plan_impression
         for day in day_left:
             region_client_sql = """
@@ -141,18 +162,34 @@ class AllotDayClientScript(BaseScript):
                 nums = nums.next()["nums"]
                 start = 0
                 end = 0
-                client = clients.cursor.fetchall() # this is a row objects
+                # 异常处理，continue
+                try: # 当异常处理表有记录时，表示已经执行过了
+                    ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day.id,
+                                                    targeting_code=region.targeting_code,
+                                                    type="allot_day_client").nums
+                    self.logger.debug(u"设置过了, %s, %s" % (day.date, region.targeting_code))
+                    continue
+                except ExceptionContinueModel.DoesNotExist:
+                    self.logger.debug("开始设置")
+                    client = clients.cursor.fetchall() # this is a row objects
 
-                for i, per in enumerate(self.client_rate):
-                    client_rate_num = nums * float(per) / 100
-                    #impression = round(client_rate_num * i)
-                    end = int(round(client_rate_num)) + start
-                    for j in client[start:end]:
-                            c = CampaignClientModel.get(CampaignClientModel.id == j[0])
-                            c.actual_plan_impression = i
-                            c.plan_impression = i
-                            c.save()
-                    start = end
+                    for i, per in enumerate(self.client_rate):
+                        self.logger.debug("%s, %s" % (i, per))
+                        client_rate_num = nums * float(per) / 100
+                        #impression = round(client_rate_num * i)
+                        end = int(round(client_rate_num)) + start
+                        # TODO: 这里慢
+                        for j in client[start:end]:
+                                c = CampaignClientModel.get(CampaignClientModel.id == j[0])
+                                c.actual_plan_impression = i
+                                c.plan_impression = i
+                                c.save()
+                        start = end
+                    self.logger.debug("%s, %s" % (day.date, region.targeting_code))
+                    ExceptionContinueModel.create(day_impression_id=day.id,
+                                                type="allot_day_client",
+                                                targeting_code=region.targeting_code,
+                                                nums=nums).save()
 
         # 更新 day_impression 的 impression
         for day in self.day_im:
@@ -168,6 +205,9 @@ class AllotDayClientScript(BaseScript):
             #day.impression = count
             #day.save()
             CampaignClientModel.raw(sql.format(day_im_id=day.id)).execute()
+
+        for day in self.day_im:
+            ExceptionContinueModel.delete().where(ExceptionContinueModel.day_impression_id == day.id)
 
 
 

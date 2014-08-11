@@ -37,12 +37,13 @@ def get_campaign_plan_queue(im_id):
 
 #logger = logging.getLogger("supplement")
 #enable_pretty_logging(logger, config.get("log", "level"))
-if config.getboolean("log", "debug"):
-    logger = logging.getLogger('peewee')
-    logger.setLevel(logging.DEBUG)
+if config.getboolean("log", "sql_record"):
+
+    logger_sql = logging.getLogger('peewee')
+    logger_sql.setLevel(logging.DEBUG)
     handler = logging.StreamHandler()
     formatter = logging.Formatter("[SQL %(asctime)s]: %(message)s")
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    logger_sql.addHandler(handler)
 
 logger = Logger("supplement")
