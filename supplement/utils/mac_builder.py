@@ -44,7 +44,7 @@ def generate_bit(exclude=None):
             while exclude == bit:
                 bit = random.randint(0x00, 0xff)
 
-    return "%02x" % bit
+    return "%02X" % bit
 
 def mac_md5(mac):
     return hashlib.md5(mac).hexdigest()
