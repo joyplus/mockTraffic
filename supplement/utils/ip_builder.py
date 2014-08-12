@@ -31,7 +31,6 @@ def generate(province_code):
 def generate_single(ip_ranges):
     ranges = random.randint(0, len(ip_ranges)-1)
     ip_range = ip_ranges[ranges]
-    ip_range = ip_ranges[0]
     ip_start = string2ip(ip_range[0])
     ip_end = string2ip(ip_range[1])
     return random.randint(ip_start, ip_end)
