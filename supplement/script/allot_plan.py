@@ -110,12 +110,9 @@ class AllotPlanScript(BaseScript):
         sql = """
         delete from bl_exception_continue where day_impression_id = {}
         """
-        for day in self.day_im:
+        for day in self.di:
             ExceptionContinueModel.raw(sql.format(day.id))
 
-
-        if impression_master_id: # 从 cli 启动时退出
-            self.exit_supervisor()
 
     def get_minute(self):
         return random.randint(0, 59)

@@ -215,9 +215,6 @@ class AllotDayClientScript(BaseScript):
         for day in self.day_im:
             ExceptionContinueModel.raw(sql.format(day.id))
 
-        if impression_master_id: # 从 cli 启动时需要退出
-            self.exit_supervisor()
-
 
     def get_addition_clients(self, targeting_code, num, day_im_id):
         """

@@ -76,8 +76,6 @@ class SendRequestScript(BaseScript):
             job = self.campaign_paln_queue.reserve(timeout=0)
 
 
-        if impression_master_id: # 从 cli 启动时退出
-            self.exit_supervisor()
 
     def get_time(self, value):
         year, month, day, hour, minute, second = value.year, value.month, value.day, value.hour, value.minute, value.second
