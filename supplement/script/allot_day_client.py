@@ -81,6 +81,7 @@ class AllotDayClientScript(BaseScript):
                                                 type="allot_day_client")
             self.logger.debug("已经分配过了")
         except ExceptionContinueModel.DoesNotExist:
+            # 清除已经异常时分配的任务
             self.logger.debug("开始分配")
             # 其他天
             # 复制第一天的 client 的 80% 到其他天
@@ -99,6 +100,7 @@ class AllotDayClientScript(BaseScript):
                     where(CampaignClientModel.day_impression_id == day.id).\
                     count()
                 # 去除第一天里 20% 的client
+                # TODO: 优化 mysql rand()
                 rv = CampaignClientModel.raw("delete from bl_campaign_client where day_impression_id = %d order by rand() limit %d" % (day.id, int(0.2 * count))).\
                     execute()
                 # 去除后的 client，如果当日各个地区的大于则去除，小于则补充
@@ -207,8 +209,11 @@ class AllotDayClientScript(BaseScript):
             #day.save()
             CampaignClientModel.raw(sql.format(day_im_id=day.id)).execute()
 
+        sql = """
+        delete from bl_exception_continue where day_impression_id = {}
+        """
         for day in self.day_im:
-            ExceptionContinueModel.delete().where(ExceptionContinueModel.day_impression_id == day.id)
+            ExceptionContinueModel.raw(sql.format(day.id))
 
         if impression_master_id: # 从 cli 启动时需要退出
             self.exit_supervisor()
