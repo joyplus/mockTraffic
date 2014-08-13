@@ -54,6 +54,7 @@ class AllotDayClientScript(BaseScript):
                 ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day_first.id,
                                                     targeting_code=code,
                                                     type="allot_day_client").nums
+                self.logger.debug(u"处理过了 %s %s" % (day_first.date, code))
                 continue
             except ExceptionContinueModel.DoesNotExist:
                 for i, per in enumerate(self.client_rate):
@@ -209,6 +210,8 @@ class AllotDayClientScript(BaseScript):
         for day in self.day_im:
             ExceptionContinueModel.delete().where(ExceptionContinueModel.day_impression_id == day.id)
 
+        if impression_master_id: # 从 cli 启动时需要退出
+            self.exit_supervisor()
 
 
     def get_addition_clients(self, targeting_code, num, day_im_id):

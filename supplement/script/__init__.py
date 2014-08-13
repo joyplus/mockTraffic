@@ -10,3 +10,6 @@ class BaseScript(object):
 
     def run(self):
         raise NotImplementedError
+
+    def exit_supervisor(self, code=11):
+        exit(code)

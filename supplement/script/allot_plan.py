@@ -130,6 +130,8 @@ class AllotPlanScript(BaseScript):
             ExceptionContinueModel.delete().where(ExceptionContinueModel.day_impression_id==day.id)
 
 
+        if impression_master_id: # 从 cli 启动时退出
+            self.exit_supervisor()
 
     def get_minute(self):
         return random.randint(0, 59)

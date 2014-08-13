@@ -45,6 +45,9 @@ class PutToQueue(BaseScript):
             self.logger.debug(value)
             self.campaign_paln_queue.put(value)
 
+        if impression_master_id: # 从 cli 启动时退出
+            self.exit_supervisor()
+
     def datetime2str(self, value):
         return value.strftime("%Y-%m-%d %H:%M:%S")
 
