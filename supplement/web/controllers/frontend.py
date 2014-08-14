@@ -249,3 +249,12 @@ def supervisor_task_state():
         rv = dict(state=111111,
                   statename="NONEXISTENCE")
     return jsonify(rv)
+
+
+@frontend.route("/ajax/supervisor/add_config", methods=["POST"])
+def supervisor_add_config():
+    name = request.form["name"]
+    task = request.form["task"]
+    program = "{name}_{task}".format(name=name, task=task)
+    rv = supervisor.server.supervisor.addProcessGroup(program)
+    return jsonify(status=rv)

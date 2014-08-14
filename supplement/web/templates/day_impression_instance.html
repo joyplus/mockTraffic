@@ -57,10 +57,15 @@
                     <i class="fa fa-spinner fa-spin hide"></i>
                     生成 supervisor 配置文件
                 </button>
+                <button class="btn btn-info" id="add-supervisor-config">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                    加载 supervisor 配置文件
+                </button>
                 <button class="btn btn-danger" id="restart-supervisor">
                     <i class="fa fa-check  hide"></i>
                     <i class="fa fa-spinner fa-spin hide"></i>
-                     重启 supervisord
+                     重启 supervisor
                 </button>
                 <button class="btn btn-info" id="combine_task-task">
                     <i class="fa fa-check  hide"></i>
@@ -120,6 +125,8 @@
                         send_request:
                     </div>
                     <div class="col-md-8 task">
+                        <div class="row" id="send_request_numprocs-status">
+                        </div>
                         <span class="label label-success hide" id="send_request-status-on"><i class="fa fa-check"></i> RUNING</span>
                         <span class="label label-danger hide" id="send_request-status-off"><i class="fa fa-exclamation"></i> <span></span></span>
                     </div>
@@ -205,6 +212,31 @@
                 name: "{{ im.id }}",
                 task: "combine_task"
             };
+            var numprocs = store.get({{ im.id }} + "numprocs");
+            if (numprocs) {
+                $("#numprocs").val(numprocs);
+                numprocs = parseInt(numprocs);
+                var initWrapper = function(i) {
+                    var html = '\
+                    <div class="status-wrapper hide">\
+                        <div class="col-md-4">send_request_<span class="numprocs">0</span>:</div>\
+                        <div class="col-md-8">\
+                            <span class="label label-success send_request-status-on"><i class="fa fa-check"></i> RUNING</span>\
+                            <span class="label label-danger hide send_request-status-off"><i class="fa fa-exclamation"></i> <span></span></span>\
+                        </div>\
+                    </div>\
+                    ';
+                    var status = $(html);
+                    status.attr("id", "send_request:{{ im.id }}_send_request_" + i);
+                    status.data("task", "send_request:{{ im.id }}_send_request_" + i);
+                    status.find(".numprocs").text(i);
+                    status.removeClass("hide");
+                    status.appendTo($("#send_request_numprocs-status"));
+                };
+                for (var i = 0; i < numprocs; i++) {
+                    initWrapper(i);
+                }
+            }
         };
         init();
         $(document).on("focusin", "input.client-mod", function() {
@@ -355,29 +387,30 @@
             };
             $.post("/ajax/supervisor/set_config", params, function(data) {
             }).done(function(data) {
-                button.eq(1).fadeIn(function() {
-                    button.eq(1).addClass("hide");
-                    button.eq(0).removeClass("hide");
-                });
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
             });
             // put2queue
             params.task = "put2queue";
             $.post("/ajax/supervisor/set_config", params, function(data) {
             }).done(function(data) {
-                button.eq(1).fadeIn(function() {
-                    button.eq(1).addClass("hide");
-                    button.eq(0).removeClass("hide");
-                });
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
             });
             // send_request
             params.task = "send_request";
             params.numprocs = $("#numprocs").val();
             $.post("/ajax/supervisor/set_config", params, function(data) {
             }).done(function(data) {
-                button.eq(1).fadeIn(function() {
-                    button.eq(1).addClass("hide");
-                    button.eq(0).removeClass("hide");
-                });
+                store.set({{ im.id }} + "numprocs", params.numprocs);
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
             });
         });
         $(document).on("click", "#restart-supervisor", function() {
@@ -486,21 +519,43 @@
                     });
                     // send_request
                     task_data.task = "send_request";
-                    $.post("/ajax/supervisor/task/state", task_data).
-                    done(function(data) {
-                        if (data.state == 20) {
-                            $("#send_request-status-on").removeClass("hide");
-                            $("#send_request-status-off").addClass("hide");
-                        } else {
+                    var numprocs = store.get({{ im.id }} + "numprocs");
+                    if (parseInt(numprocs) > 1) {
+                        $.each($(".status-wrapper"), function() {
+                            var task = $(this).data("task");
+                            var params = {
+                                name: "{{ im.id }}",
+                                task: task
+                            };
+                            var wrapper = $(this);
+                            $.post("/ajax/supervisor/task/state", params).done(function(data) {
+                                if (data.state == 20) {
+                                    wrapper.find(".send_request-status-on").removeClass("hide");
+                                    wrapper.find(".send_request-status-off").addClass("hide");
+                                } else {
+                                    wrapper.find(".send_request-status-on").addClass("hide");
+                                    wrapper.find(".send_request-status-off").removeClass("hide");
+                                    wrapper.find(".send_request-status-off span").text(data.statename);
+                                }
+                            });
+                        });
+                    } else {
+                        $.post("/ajax/supervisor/task/state", task_data).
+                        done(function(data) {
+                            if (data.state == 20) {
+                                $("#send_request-status-on").removeClass("hide");
+                                $("#send_request-status-off").addClass("hide");
+                            } else {
+                                $("#send_request-status-on").addClass("hide");
+                                $("#send_request-status-off").removeClass("hide");
+                                $("#send_request-status-off span").text(data.statename);
+                            }
+                        }).fail(function() {
                             $("#send_request-status-on").addClass("hide");
                             $("#send_request-status-off").removeClass("hide");
-                            $("#send_request-status-off span").text(data.statename);
-                        }
-                    }).fail(function() {
-                        $("#send_request-status-on").addClass("hide");
-                        $("#send_request-status-off").removeClass("hide");
-                        $("#send_request-status-off span").text("FAILED");
-                    });
+                            $("#send_request-status-off span").text("FAILED");
+                        });
+                    }
                 } else {
                     $("#supervisord-status-on").addClass("hide");
                     $("#supervisord-status-off span").text(data.statename);
@@ -511,6 +566,41 @@
                 $("#supervisord-status-off span").text("FAILED");
                 $("#supervisord-status-off").removeClass("hide");
                 $("div.task").hide();
+            });
+        });
+        $(document).on("click", "#add-supervisor-config", function() {
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            // combine_task
+            var params = {
+                name: {{ im.id }},
+                task: "combine_task",
+                args: "{{ im.id }}"
+            };
+            $.post("/ajax/supervisor/add_config", params, function(data) {
+            }).done(function(data) {
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
+            });
+            // put2queue
+            params.task = "put2queue";
+            $.post("/ajax/supervisor/add_config", params, function(data) {
+            }).done(function(data) {
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
+            });
+            // send_request
+            params.task = "send_request";
+            $.post("/ajax/supervisor/add_config", params, function(data) {
+            }).done(function(data) {
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
             });
         });
     });

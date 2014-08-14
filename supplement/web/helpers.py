@@ -36,7 +36,7 @@ def set_supervisor_config(app, name, task, args, numprocs=1):
     command = "{py_path} {cli} {task} {args}".format(py_path=app.config["PYTHON_PATH"], cli=app.config["CLI_FILE"], task=task, args=args)
     config.set(program, "command", command)
     if int(numprocs) > 1:
-        config.set(program, "process_name", "%(program_name)s_%(process_num)02d")
+        config.set(program, "process_name", "%(program_name)s_%(process_num)s")
     config.set(program, "numprocs", numprocs)
     config.set(program, "autorestart", "unexpected")
     config.set(program, "autostart", "false")
