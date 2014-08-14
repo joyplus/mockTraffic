@@ -210,10 +210,10 @@ class AllotDayClientScript(BaseScript):
             CampaignClientModel.raw(sql.format(day_im_id=day.id)).execute()
 
         sql = """
-        delete from bl_exception_continue where day_impression_id = {}
+        delete from bl_exception_continue where day_impression_id = {day_im_id}
         """
         for day in self.day_im:
-            ExceptionContinueModel.raw(sql.format(day.id))
+            ExceptionContinueModel.raw(sql.format(day_im_id=day.id))
 
 
     def get_addition_clients(self, targeting_code, num, day_im_id):

@@ -54,64 +54,65 @@ class AllotPlanScript(BaseScript):
 
             for hour in self.clock_rate:
                 client_plan_nums = impression * hour.rate / 100; # 一小时的 client
-                try:
-                    ExceptionContinueModel.get(day_impression_id=day.id,
-                                               type="allot_plan",
-                                               targeting_code=hour.targeting_code,
-                                               hour=hour.targeting_code,
-                                               nums=int(client_plan_nums))
-                    self.logger.debug("已经分配过了")
-                    continue
-                except ExceptionContinueModel.DoesNotExist:
-                    pass
+                #try:
+                    #ExceptionContinueModel.get(day_impression_id=day.id,
+                                               #type="allot_plan",
+                                               #targeting_code=hour.targeting_code,
+                                               #hour=hour.targeting_code,
+                                               #nums=int(client_plan_nums))
+                    #self.logger.debug("已经分配过了")
+                    #continue
+                #except ExceptionContinueModel.DoesNotExist:
+                    #pass
 
                 self.logger.debug("开始分配")
                 rand_mysql = """
-                SELECT * FROM `bl_campaign_client` AS t1\
-                JOIN (SELECT ROUND(RAND() * ((SELECT MAX(id) FROM `bl_campaign_client`)-(SELECT MIN(id) FROM `bl_campaign_client`))+(SELECT MIN(id) FROM `bl_campaign_client`)) AS id) AS t2
-                WHERE t1.id >= t2.id and t1.plan_impression > 0 and t1.actual_plan_impression > 0 and t1.day_impression_id = {day_im_id}
-                ORDER BY t1.id LIMIT 1;
+                SELECT * FROM `bl_campaign_client` AS t1
+                JOIN (SELECT ROUND(RAND() * ((SELECT MAX(id) FROM `bl_campaign_client`
+                where `bl_campaign_client`.day_impression_id = {day_im_id})-(SELECT MIN(id) FROM `bl_campaign_client`
+                where `bl_campaign_client`.day_impression_id = {day_im_id}))+(SELECT MIN(id) FROM `bl_campaign_client`
+                where `bl_campaign_client`.day_impression_id = {day_im_id})) AS id) AS t2
+                WHERE t1.id >= t2.id and t1.day_impression_id = {day_im_id} and t1.actual_plan_impression > 0 and t1.plan_impression > 0
+                ORDER BY t1.id LIMIT {number};
                 """
 
                 client_used_list = list() # 用完的 client
-                nums = int(client_plan_nums)
+                nums = int(client_plan_nums) # 这一小时的 client 总量
+                number = 10
 
                 while nums > 0:
-                    client = CampaignClientModel.raw(rand_mysql.format(day_im_id=day.id)).execute() # 随机取一条数据
-                    try:
-                        client = client.next()
-                    except StopIteration:
-                        continue
+                    client = CampaignClientModel.raw(rand_mysql.format(day_im_id=day.id, number=number)).execute() # 随机取一条数据
 
-                    if client.id in client_used_list:
-                        continue
+                    for i in client:
+                        if i.id in client_used_list:
+                            continue
 
-                    client.actual_plan_impression -= 1
-                    client.save()
-                    client_used_list.append(client.id)
+                        i.actual_plan_impression -= 1
+                        i.save()
+                        client_used_list.append(i.id)
 
-                    CampaignPlanModel.create(impression_master_id=self.im_id,
-                                             client_master_id=client.client_id,
-                                             campaign_date="%s %s:%0.2d:%0.2d" % (
-                                                 day.date, hour.targeting_code,
-                                                 self.get_minute(),
-                                                 self.get_seconed()
+                        CampaignPlanModel.create(impression_master_id=self.im_id,
+                                                client_master_id=i.client_id,
+                                                campaign_date="%s %s:%0.2d:%0.2d" % (
+                                                    day.date, hour.targeting_code,
+                                                    self.get_minute(),
+                                                    self.get_seconed()
+                                                    )
                                                 )
-                                             )
-                    nums -= 1
+                        nums -= 1
 
 
-                ExceptionContinueModel.create(day_impression_id=day.id,
-                                                type="allot_plan",
-                                                targeting_code=hour.targeting_code,
-                                                hour=hour.targeting_code,
-                                                nums=int(client_plan_nums))
+                #ExceptionContinueModel.create(day_impression_id=day.id,
+                                                #type="allot_plan",
+                                                #targeting_code=hour.targeting_code,
+                                                #hour=hour.targeting_code,
+                                                #nums=int(client_plan_nums))
 
-        sql = """
-        delete from bl_exception_continue where day_impression_id = {}
-        """
-        for day in self.di:
-            ExceptionContinueModel.raw(sql.format(day.id))
+        #sql = """
+        #delete from bl_exception_continue where day_impression_id = {day_im_id}
+        #"""
+        #for day in self.di:
+            #ExceptionContinueModel.raw(sql.format(day_im_id=day.id))
 
 
     def get_minute(self):

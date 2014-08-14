@@ -38,7 +38,6 @@ def main():
         params = sys.argv[2:]
         if scripts.get(script):
             scripts[script]().run(*params)
-            exit(11)
         else:
             logger.warning("no script " + script)
 
@@ -71,6 +70,8 @@ if __name__ == '__main__':
                     if not config.getboolean("log", "debug"):
                         try:
                             main()
+                            logger.info("stop: %s" % time())
+                            exit(11)
                         except KeyboardInterrupt:
                             exit(0)
                         except Exception as e:
