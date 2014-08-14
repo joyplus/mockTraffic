@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-heading">
+    </div>
+    <div class="panel-body">
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th>id</th>
+            <th>投放名称</th>
+            <th>请求链接1</th>
+            <th>请求链接2</th>
+            <th>请求链接3</th>
+            <th>开始日期</th>
+            <th>结束日期</th>
+            <th>rate</th>
+            <th>day task</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for i in ims %}
+        <tr>
+            <td class="impression_master_id">{{ i.id }}</td>
+            <td><a href="/instance/d/{{ i.id }}">{{ i.campaign_name }}</a></td>
+            <td><a href="javascript:void(0);" style="color: black;" title="{{ i.tracking_url_1 }}">{{ i.tracking_url_1[:20] }}...</a></td>
+            <td><a href="javascript:void(0);" style="color: black;" title="{{ i.tracking_url_2 }}">{{ i.tracking_url_2[:20] }}...</a></td>
+            <td><a href="javascript:void(0);" style="color: black;" title="{{ i.tracking_url_3 }}">{{ i.tracking_url_3[:20] }}...</a></td>
+            <td>{{ i.start_date }}</td>
+            <td>{{ i.end_date }}</td>
+            <td><i class="fa fa-spinner fa-spin"></i></td>
+            <td><i class="fa fa-spinner fa-spin"></i></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="panel-footer">
+        <ul class="pager">
+            <li class="previous"><a href="/instance/page/{{ page-1 }}">&larr; Older</a></li>
+            <li class="next"><a href="/instance/page/{{ page+1 }}">Newer &rarr;</a></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+    $(function() {
+        var init = function() {
+            var ids = $(".impression_master_id");
+            $.each(ids, function(i, e) {
+                var id = $(this);
+                $.get("/ajax/instance/" + id.text(), function(data) {
+                    console.log(data);
+                    if (data.day_impression_status == true) {
+                        id.nextAll().eq(7).find("i").removeClass("fa-spinner");
+                        id.nextAll().eq(7).find("i").removeClass("fa-spin");
+                        id.nextAll().eq(7).find("i").addClass("fa-check");
+                        id.nextAll().eq(7).find("i").addClass("text-success");
+                    }
+                    if (data.rate_allocation_status == true) {
+                        id.nextAll().eq(6).find("i").removeClass("fa-spinner");
+                        id.nextAll().eq(6).find("i").removeClass("fa-spin");
+                        id.nextAll().eq(6).find("i").addClass("fa-check");
+                        id.nextAll().eq(6).find("i").addClass("text-success");
+                    }
+                });
+            });
+        };
+        init();
+    });
+</script>
+{% endblock %}

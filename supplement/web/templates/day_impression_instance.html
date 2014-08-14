@@ -1,0 +1,518 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <div class="clearfix">
+            <div class="pull-left">
+                {{ im.campaign_name }}-每日任务
+            </div>
+        <div class="pull-right">
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary" id="clock-modal-button">时间比例</button>
+                <button type="button" class="btn btn-primary" id="region-modal-button">地区比例</button>
+            </div>
+        </div>
+        </div>
+    </div>
+    <div class="panel-body">
+        {% if dims.count() == 0 %}
+        <a href="/instance/d/{{ im.id }}/add" class="btn btn-primary">增加</a>
+        {% else %}
+        <table class="table table-striped">
+            <thead>
+            <tr>
+                <th>id</th>
+                <th>日期</th>
+                <th>impression</th>
+                <th>client</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for i in dims %}
+                <tr>
+                    <td>{{ i.id }}</td>
+                    <td>{{ i.date }}</td>
+                    <td>{{ i.impression }}</td>
+                    <td>
+                        <input type="number" data-id="{{ i.id }}" class="client-mod" value="{{ i.client }}">
+                        <button type="button" class="btn btn-success btn-sm client-mod">
+                            <i class="fa fa-check  hide"></i>
+                            <i class="fa fa-spinner fa-spin hide"></i>
+                            修改
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+    <div class="panel-footer">
+        <div class="task-control" style="display: none;">
+            <label for="" class="col-md-1">numprocs</label>
+            <input type="number" value="1" class="input-sm" id="numprocs">
+            <div class="btn-group">
+                <button class="btn btn-info" id="generate-supervisor-config">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                    生成 supervisor 配置文件
+                </button>
+                <button class="btn btn-danger" id="restart-supervisor">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                     重启 supervisord
+                </button>
+                <button class="btn btn-info" id="combine_task-task">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                    部署任务
+                </button>
+                <button class="btn btn-info" id="put2queue-task">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                    放入队列
+                </button>
+                <button class="btn btn-primary" id="send_request-task">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                    启动任务
+                </button>
+                <button class="btn btn-warning" id="supervisor-task">
+                   supervisor status
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" role="dialog" aria-labelledby="supervisor-modal" aria-hidden="true" id="supervisor-modal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            <h4 class="modal-title">Supervisor status</h4>
+        </div>
+        <div class="modal-body">
+            <div class="">
+                <div class="row">
+                    <div class="col-md-4">
+                        supervisord:
+                    </div>
+                    <div class="col-md-8">
+                        <span class="label label-success hide" id="supervisord-status-on"><i class="fa fa-check"></i> <span>RUNING</span></span>
+                        <span class="label label-danger hide" id="supervisord-status-off"><i class="fa fa-exclamation"></i> <span>STOP</span></span>
+                    </div>
+                    <div class="col-md-4 task">
+                        combine_task:
+                    </div>
+                    <div class="col-md-8 task">
+                        <span class="label label-success hide" id="combine_task-status-on"><i class="fa fa-check"></i> RUNING</span>
+                        <span class="label label-danger hide" id="combine_task-status-off"><i class="fa fa-exclamation"></i> <span></span></span>
+                    </div>
+                    <div class="col-md-4 task">
+                        put2queue:
+                    </div>
+                    <div class="col-md-8 task">
+                        <span class="label label-success hide" id="put2queue-status-on"><i class="fa fa-check"></i> RUNING</span>
+                        <span class="label label-danger hide" id="put2queue-status-off"><i class="fa fa-exclamation"></i> <span></span></span>
+                    </div>
+                    <div class="col-md-4 task">
+                        send_request:
+                    </div>
+                    <div class="col-md-8 task">
+                        <span class="label label-success hide" id="send_request-status-on"><i class="fa fa-check"></i> RUNING</span>
+                        <span class="label label-danger hide" id="send_request-status-off"><i class="fa fa-exclamation"></i> <span></span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" role="dialog" aria-labelledby="region-modal" aria-hidden="true" id="region-modal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            <h4 class="modal-title">地区比例</h4>
+            <span>总共: <span id="region-rate-number"></span>%</span>
+        </div>
+        <div class="modal-body">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>地区</th>
+                    <th>比例</th>
+                </tr>
+            </thead>
+            <tbody id="region-modal-value">
+            </tbody>
+        </table>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" role="dialog" aria-labelledby="clock-modal" aria-hidden="true" id="clock-modal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            <h4 class="modal-title">时间比例</h4>
+            <span>总共: <span id="clock-rate-number"></span>%</span>
+        </div>
+        <div class="modal-body">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>比例</th>
+                </tr>
+            </thead>
+            <tbody id="clock-modal-value">
+            </tbody>
+        </table>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block script %}
+<script>
+    $(function() {
+        var init = function() {
+            var id = {{ im.id }};
+            $.get("/ajax/instance/" + id, function(data) {
+                console.log(data);
+                if (data.day_impression_status == true && data.rate_allocation_status == true) {
+                    $(".task-control").show();
+                } else {
+                    $(".task-control").hide();
+                }
+            });
+            var data = {
+                name: "{{ im.id }}",
+                task: "combine_task"
+            };
+        };
+        init();
+        $(document).on("focusin", "input.client-mod", function() {
+            $(this).next().find("i").eq(0).addClass("hide");
+        });
+        $(document).on("click", "button.client-mod", function() {
+            var input = $(this).prev();
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                id: input.data("id"),
+                client: input.val()
+            };
+            $.post("/ajax/instance/d/mod", data, function(data) {
+            }).done(function(data){
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        })
+        $(document).on("click", "#region-modal-button", function() {
+            $("#region-modal").modal("show");
+            $("#region-modal-value").html("");
+            $.get("/ajax/instance/rate/region/{{ im.id }}", function(data) {
+            }).done(function(data) {
+                console.log(data);
+                if ($.isEmptyObject(data)) {
+                    $("#region-modal-value").html("<tr><td colspan=2><a href='/instance/rate/region/{{ im.id }}/add' class='btn btn-primary form-control'>添加</a></td></tr>");
+                    return;
+                }
+                $.each(data, function(key, value) {
+                    var tr = $("<tr></tr>");
+                    var td1 = $("<td>" + value[0] + "</td>");
+                    tr.append(td1);
+                    var html = '\
+                        <input type="number" step="any" data-id="' + key + '" class="region-rate-mod" value="' + value[1] + '"> \
+                        <button type="button" class="btn btn-success btn-sm region-rate-mod">\
+                            <i class="fa fa-check  hide"></i>\
+                            <i class="fa fa-spinner fa-spin hide"></i>\
+                            修改\
+                        </button>\
+                    '
+                    var td2 = $("<td></td>");
+                    td2.html(html);
+                    tr.append(td2);
+                    tr.appendTo($("#region-modal-value"));
+                });
+                var total = 0;
+                $.each($("input.region-rate-mod"), function() {
+                    total += parseFloat($(this).val());
+                });
+                $("#region-rate-number").text(total);
+            });
+        });
+        $(document).on("click", "#clock-modal-button", function() {
+            $("#clock-modal").modal("show");
+            $("#clock-modal-value").html("");
+            $.get("/ajax/instance/rate/clock/{{ im.id }}", function(data) {
+            }).done(function(data) {
+                console.log(data);
+                if ($.isEmptyObject(data)) {
+                    $("#clock-modal-value").html("<tr><td colspan=2><a href='/instance/rate/clock/{{ im.id }}/add' class='btn btn-primary form-control'>添加</a></td></tr>");
+                    return;
+                }
+                $.each(data, function(key, value) {
+                    var tr = $("<tr></tr>");
+                    var td1 = $("<td>" + value[0] + "</td>");
+                    tr.append(td1);
+                    var html = '\
+                        <input type="number" step="any" data-id="' + key + '" class="clock-rate-mod" value="' + value[1] + '"> \
+                        <button type="button" class="btn btn-success btn-sm clock-rate-mod">\
+                            <i class="fa fa-check  hide"></i>\
+                            <i class="fa fa-spinner fa-spin hide"></i>\
+                            修改\
+                        </button>\
+                    '
+                    var td2 = $("<td></td>");
+                    td2.html(html);
+                    tr.append(td2);
+                    tr.appendTo($("#clock-modal-value"));
+                });
+                var total = 0;
+                $.each($("input.clock-rate-mod"), function() {
+                    total += parseFloat($(this).val());
+                });
+                $("#clock-rate-number").text(total);
+            });
+        });
+        $(document).on("click", "button.region-rate-mod", function() {
+            var input = $(this).prev();
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                id: input.data("id"),
+                rate: input.val()
+            };
+            $.post("/ajax/instance/rate/mod", data, function(data) {
+            }).done(function(data){
+                console.log(data);
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+                var total = 0;
+                $.each($("input.region-rate-mod"), function() {
+                    total += parseFloat($(this).val());
+                });
+                $("#region-rate-number").text(total);
+            });
+        })
+        $(document).on("click", "button.clock-rate-mod", function() {
+            var input = $(this).prev();
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                id: input.data("id"),
+                rate: input.val()
+            };
+            $.post("/ajax/instance/rate/mod", data, function(data) {
+            }).done(function(data){
+                console.log(data);
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+                var total = 0;
+                $.each($("input.clock-rate-mod"), function() {
+                    total += parseFloat($(this).val());
+                });
+                $("#clock-rate-number").text(total);
+            });
+        })
+        $(document).on("focusin", "input.clock-rate-mod", function() {
+            $(this).next().find("i").eq(0).addClass("hide");
+        });
+        $(document).on("focusin", "input.region-rate-mod", function() {
+            $(this).next().find("i").eq(0).addClass("hide");
+        });
+        $(document).on("click", "#generate-supervisor-config", function() {
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            // combine_task
+            var params = {
+                name: {{ im.id }},
+                task: "combine_task",
+                args: "{{ im.id }}"
+            };
+            $.post("/ajax/supervisor/set_config", params, function(data) {
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+            // put2queue
+            params.task = "put2queue";
+            $.post("/ajax/supervisor/set_config", params, function(data) {
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+            // send_request
+            params.task = "send_request";
+            params.numprocs = $("#numprocs").val();
+            $.post("/ajax/supervisor/set_config", params, function(data) {
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        });
+        $(document).on("click", "#restart-supervisor", function() {
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            $.post("/ajax/supervisor/restart", function(){
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        });
+        $(document).on("click", "#combine_task-task", function() {
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                name: {{ im.id }},
+                task: "combine_task"
+            };
+            $.post("/ajax/supervisor/start", data, function(){
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        });
+        $(document).on("click", "#put2queue-task", function() {
+            console.log("hi");
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                name: {{ im.id }},
+                task: "put2queue"
+            };
+            $.post("/ajax/supervisor/start", data, function(){
+            }).done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        });
+        $(document).on("click", "#send_request-task", function() {
+            console.log("hi");
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                name: {{ im.id }},
+                task: "send_request"
+            };
+            $.post("/ajax/supervisor/start", data, function(){
+            }).done(function(data) {
+                console.log(data);
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            });
+        });
+        $(document).on("click", "#supervisor-task", function() {
+            $("#supervisor-modal").modal("show");
+            $.post("/ajax/supervisor/get_state", function() {
+            }).done(function(data) {
+                $("div.task").fadeIn();
+                if (data.statecode == 1) {
+                    $("#supervisord-status-on").removeClass("hide");
+                    $("#supervisord-status-off").addClass("hide");
+                    var task_data = {
+                        name: "{{ im.id }}",
+                        task: "combine_task"
+                    };
+                    // combine_task
+                    $.post("/ajax/supervisor/task/state", task_data).
+                    done(function(data) {
+                        if (data.state == 20) {
+                            $("#combine_task-status-on").removeClass("hide");
+                            $("#combine_task-status-off").addClass("hide");
+                        } else {
+                            $("#combine_task-status-on").addClass("hide");
+                            $("#combine_task-status-off").removeClass("hide");
+                            $("#combine_task-status-off span").text(data.statename);
+                        }
+                    }).fail(function() {
+                        $("#combine_task-status-on").addClass("hide");
+                        $("#combine_task-status-off").removeClass("hide");
+                        $("#combine_task-status-off span").text("FAILED");
+                    });
+                    // put2queue
+                    task_data.task = "put2queue";
+                    $.post("/ajax/supervisor/task/state", task_data).
+                    done(function(data) {
+                        if (data.state == 20) {
+                            $("#put2queue-status-on").removeClass("hide");
+                            $("#put2queue-status-off").addClass("hide");
+                        } else {
+                            $("#put2queue-status-on").addClass("hide");
+                            $("#put2queue-status-off").removeClass("hide");
+                            $("#put2queue-status-off span").text(data.statename);
+                        }
+                    }).fail(function() {
+                        $("#put2queue-status-on").addClass("hide");
+                        $("#put2queue-status-off").removeClass("hide");
+                        $("#put2queue-status-off span").text("FAILED");
+                    });
+                    // send_request
+                    task_data.task = "send_request";
+                    $.post("/ajax/supervisor/task/state", task_data).
+                    done(function(data) {
+                        if (data.state == 20) {
+                            $("#send_request-status-on").removeClass("hide");
+                            $("#send_request-status-off").addClass("hide");
+                        } else {
+                            $("#send_request-status-on").addClass("hide");
+                            $("#send_request-status-off").removeClass("hide");
+                            $("#send_request-status-off span").text(data.statename);
+                        }
+                    }).fail(function() {
+                        $("#send_request-status-on").addClass("hide");
+                        $("#send_request-status-off").removeClass("hide");
+                        $("#send_request-status-off span").text("FAILED");
+                    });
+                } else {
+                    $("#supervisord-status-on").addClass("hide");
+                    $("#supervisord-status-off span").text(data.statename);
+                    $("#supervisord-status-off").removeClass("hide");
+                }
+            }).fail(function() {
+                $("#supervisord-status-on").addClass("hide");
+                $("#supervisord-status-off span").text("FAILED");
+                $("#supervisord-status-off").removeClass("hide");
+                $("div.task").hide();
+            });
+        });
+    });
+</script>
+{% endblock %}
