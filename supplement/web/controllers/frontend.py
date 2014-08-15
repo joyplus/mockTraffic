@@ -256,5 +256,6 @@ def supervisor_add_config():
     name = request.form["name"]
     task = request.form["task"]
     program = "{name}_{task}".format(name=name, task=task)
+    supervisor.server.supervisor.reloadConfig()
     rv = supervisor.server.supervisor.addProcessGroup(program)
     return jsonify(status=rv)

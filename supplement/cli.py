@@ -83,3 +83,4 @@ if __name__ == '__main__':
 
                     end = time()
                     logger.info("stop: %s" % end)
+                    exit(11)
