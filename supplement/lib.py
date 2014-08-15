@@ -6,21 +6,31 @@ from peewee import MySQLDatabase
 import logging
 import beanstalkc
 from logbook import Logger
+from redis import StrictRedis as Redis
 
 config = ConfigParser.ConfigParser()
 config.readfp(open('config.ini'))
 
+
 def db():
 
     _db = MySQLDatabase(database=config.get("database", "name"),
-                    host=config.get("database", "host"),
-                    port=config.getint("database", "port"),
-                    user=config.get("database", "user"),
-                    passwd=config.get("database", "pass"),
-                    charset="utf8",
-                    )
+                        host=config.get("database", "host"),
+                        port=config.getint("database", "port"),
+                        user=config.get("database", "user"),
+                        passwd=config.get("database", "pass"),
+                        charset="utf8",
+                        )
     _db.connect()
     return _db
+
+
+def redis():
+
+    _db = Redis(host=config.get("redis", "host"),
+                port=config.getint("redis", "port"))
+    return _db
+
 
 # beanstalkc
 def get_queue(tube=None):
@@ -30,9 +40,9 @@ def get_queue(tube=None):
         beanstalk.watch(tube)
     return beanstalk
 
+
 def get_campaign_plan_queue(im_id):
     return get_queue(config.get("tubes", "campaign_plan") + "_%s" % im_id)
-
 
 
 #logger = logging.getLogger("supplement")

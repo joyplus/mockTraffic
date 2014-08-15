@@ -45,74 +45,102 @@ class AllotPlanScript(BaseScript):
         elif not self.di:
             self.logger.warning("[AllocationScript]: no day_impression")
 
+        # put to redis
+        for day in self.di:
+            clients = CampaignClientModel.select(CampaignClientModel.id,
+                                                 CampaignClientModel.plan_impression,
+                                                 CampaignClientModel.client_id).\
+                where(CampaignClientModel.day_impression_id==day.id,
+                      CampaignClientModel.plan_impression>0)
+            self.logger.debug("start put clients {im_id}:{day_impression_id} to redis.".\
+                              format(im_id=self.im_id, day_impression_id=day.id))
+
+            for client in clients:
+
+                pipe = self.redis.pipeline()
+                value = dict(id=client.id,
+                             client_id=client.client_id,
+                             actual_plan_impression=client.plan_impression)
+
+                key = "campaign_client:{id}:{day_impression_id}".format(id=client.id,
+                                                                           day_impression_id=day.id)
+                pipe.hmset(self.wrapper_redis_key(key), value)
+                list_key = "campaign_client:{im_id}:{day_impression_id}".format(im_id=self.im_id,
+                                                                                   day_impression_id=day.id)
+                pipe.lpush(self.wrapper_redis_key(list_key), client.id)
+                pipe.execute()
+
+            self.logger.debug("end put clients {im_id}:{day_impression_id} to redis, total {nums}.".\
+                              format(im_id=self.im_id,
+                                     day_impression_id=day.id,
+                                     nums=clients.count()))
+
+
         for day in self.di:
             impression = day.impression
-            #client_num = day.client
 
             if impression <= 0:
                 continue
 
+            self.logger.debug("start day:{im_id}:{day_impression_id}.".\
+                              format(im_id=self.im_id, day_impression_id=day.id))
+
             for hour in self.clock_rate:
                 client_plan_nums = impression * hour.rate / 100; # 一小时的 client
-                #try:
-                    #ExceptionContinueModel.get(day_impression_id=day.id,
-                                               #type="allot_plan",
-                                               #targeting_code=hour.targeting_code,
-                                               #hour=hour.targeting_code,
-                                               #nums=int(client_plan_nums))
-                    #self.logger.debug("已经分配过了")
-                    #continue
-                #except ExceptionContinueModel.DoesNotExist:
-                    #pass
+                self.logger.debug("start hour:{hour}:{client_plan_nums}.".\
+                                  format(im_id=self.im_id,
+                                         day_impression_id=day.id,
+                                         hour=hour.targeting_code,
+                                         client_plan_nums=client_plan_nums))
 
-                self.logger.debug("开始分配")
-                rand_mysql = """
-                SELECT * FROM `bl_campaign_client` AS t1
-                JOIN (SELECT ROUND(RAND() * ((SELECT MAX(id) FROM `bl_campaign_client`
-                where `bl_campaign_client`.day_impression_id = {day_im_id})-(SELECT MIN(id) FROM `bl_campaign_client`
-                where `bl_campaign_client`.day_impression_id = {day_im_id}))+(SELECT MIN(id) FROM `bl_campaign_client`
-                where `bl_campaign_client`.day_impression_id = {day_im_id})) AS id) AS t2
-                WHERE t1.id >= t2.id and t1.day_impression_id = {day_im_id} and t1.actual_plan_impression > 0 and t1.plan_impression > 0
-                ORDER BY t1.id LIMIT {number};
-                """
+                list_key = "campaign_client:{im_id}:{day_impression_id}".format(im_id=self.im_id,
+                                                                                day_impression_id=day.id)
+                # 此处会占大量内存
+                client_ids = self.redis.lrange(self.wrapper_redis_key(list_key), 0, -1) # 复制全部到 python 中
 
-                client_used_list = list() # 用完的 client
                 nums = int(client_plan_nums) # 这一小时的 client 总量
-                number = 10
 
                 while nums > 0:
-                    client = CampaignClientModel.raw(rand_mysql.format(day_im_id=day.id, number=number)).execute() # 随机取一条数据
+                    if not client_ids:
+                        break
 
-                    for i in client:
-                        if i.id in client_used_list:
-                            continue
+                    client_id = random.choice(client_ids) # 随机从 list 中选一个
+                    client_ids.remove(client_id) # 移除
 
-                        i.actual_plan_impression -= 1
-                        i.save()
-                        client_used_list.append(i.id)
+                    key = "campaign_client:{id}:{day_impression_id}".format(id=client_id,
+                                                                            day_impression_id=day.id)
+                    client = self.redis.hgetall(self.wrapper_redis_key(key))
+                    client["actual_plan_impression"] = int(client["actual_plan_impression"])
 
-                        CampaignPlanModel.create(impression_master_id=self.im_id,
-                                                client_master_id=i.client_id,
-                                                campaign_date="%s %s:%0.2d:%0.2d" % (
-                                                    day.date, hour.targeting_code,
-                                                    self.get_minute(),
-                                                    self.get_seconed()
-                                                    )
+                    if client["actual_plan_impression"] == 0:
+                        self.redis.lrem(self.wrapper_redis_key(list_key), 0, client_id) # 移除 actual_plan_impression 为 0 的
+                        continue
+
+                    key = "campaign_client:{id}:{day_impression_id}".format(id=client["id"],
+                                                                            day_impression_id=day.id)
+                    self.redis.hincrby(self.wrapper_redis_key(key),
+                                    "actual_plan_impression",
+                                    -1)
+
+                    self.logger.debug("start {im_id}:{day_impression_id}:hour:{hour}:{client_plan_nums}.".\
+                                  format(im_id=self.im_id,
+                                         day_impression_id=day.id,
+                                         hour=hour.targeting_code,
+                                         client_plan_nums=nums))
+
+                    CampaignPlanModel.create(impression_master_id=self.im_id,
+                                            client_master_id=client["client_id"],
+                                            campaign_date="%s %s:%0.2d:%0.2d" % (
+                                                day.date, hour.targeting_code,
+                                                self.get_minute(),
+                                                self.get_seconed()
                                                 )
-                        nums -= 1
+                                            )
+                    nums -= 1
 
+                self.logger.debug("end hour:{hour}.".\
+                                  format(im_id=self.im_id, day_impression_id=day.id, hour=hour.targeting_code))
 
-                #ExceptionContinueModel.create(day_impression_id=day.id,
-                                                #type="allot_plan",
-                                                #targeting_code=hour.targeting_code,
-                                                #hour=hour.targeting_code,
-                                                #nums=int(client_plan_nums))
-
-        #sql = """
-        #delete from bl_exception_continue where day_impression_id = {day_im_id}
-        #"""
-        #for day in self.di:
-            #ExceptionContinueModel.raw(sql.format(day_im_id=day.id))
 
 
     def get_minute(self):
