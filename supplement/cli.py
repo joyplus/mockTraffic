@@ -13,7 +13,7 @@ from script.send_request import SendRequestScript
 from script.get_result import GetResultScript
 from script.combine_task import CombineTaskScript
 from time import time
-from logbook import NullHandler, StreamHandler
+from logbook import NullHandler, StreamHandler, set_datetime_format
 
 scripts = {
         "client_master": ClientMaster,
@@ -57,6 +57,7 @@ formatter_str = "[{record.level_name} {record.time} {record.module}:{record.line
 info_handler.format_string = formatter_str
 error_handler.format_string = formatter_str
 debug_handler.format_string = formatter_str
+set_datetime_format("local")
 
 
 if __name__ == '__main__':
