@@ -30,6 +30,13 @@ class PutToQueue(BaseScript):
         self.campaign_paln_queue = get_campaign_plan_queue(self.im_id)
         self.campaign_paln_queue.use(config.get("tubes", "campaign_plan") + "_%s" % self.im_id)
 
+        # 异常处理，如果队列里有则清空队列
+        job = self.campaign_paln_queue.reserve(timeout=0)
+        while job:
+            job.delete()
+            job = self.campaign_paln_queue.reserve(timeout=0)
+        # 清空完毕，继续进行
+
         plans = self.get_campaign_plan(impression_master_id)
         for plan in plans:
             value = dict(id=plan.id,  # client_id
