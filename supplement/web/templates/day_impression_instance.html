@@ -213,7 +213,7 @@
                 task: "combine_task"
             };
             var numprocs = store.get({{ im.id }} + "numprocs");
-            if (numprocs) {
+            if (numprocs > 1) {
                 $("#numprocs").val(numprocs);
                 numprocs = parseInt(numprocs);
                 var initWrapper = function(i) {
@@ -463,14 +463,26 @@
                 name: {{ im.id }},
                 task: "send_request"
             };
-            $.post("/ajax/supervisor/start", data, function(){
-            }).done(function(data) {
-                console.log(data);
-                button.eq(1).fadeIn(function() {
-                    button.eq(1).addClass("hide");
-                    button.eq(0).removeClass("hide");
+            var numprocs = store.get({{ im.id }} + "numprocs");
+            if (parseInt(numprocs) > 1) {
+                $.post("/ajax/supervisor/group/start", data, function(){
+                }).done(function(data) {
+                    console.log(data);
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
                 });
-            });
+            } else {
+                $.post("/ajax/supervisor/start", data, function(){
+                }).done(function(data) {
+                    console.log(data);
+                    button.eq(1).fadeIn(function() {
+                        button.eq(1).addClass("hide");
+                        button.eq(0).removeClass("hide");
+                    });
+                });
+            }
         });
         $(document).on("click", "#supervisor-task", function() {
             $("#supervisor-modal").modal("show");

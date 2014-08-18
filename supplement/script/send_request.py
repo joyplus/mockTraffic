@@ -65,7 +65,7 @@ class SendRequestScript(BaseScript):
                 urllib2.urlopen(
                     url.format(mac=params["mac_md5"], ip=params["ip"])).read()
                 CampaignPlanModel.raw(
-                    "UPDATE bl_campaign_plan set status=1 where id={}".format(params["plan_id"])).\
+                    "UPDATE bl_campaign_plan set status=1 where id={id}".format(id=params["plan_id"])).\
                     execute()
             except (urllib2.URLError, urllib2.HTTPError) as e:
                 self.logger.error("send_request error, task: %r, exception: %r" % (params, e))

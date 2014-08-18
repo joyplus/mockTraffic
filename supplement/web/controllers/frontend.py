@@ -230,7 +230,15 @@ def supervisor_start():
     rv = supervisor.server.supervisor.startProcess(program)
     return jsonify(status=rv)
 
-@frontend.route("/ajax/supervisor/start", methods=["POST"])
+@frontend.route("/ajax/supervisor/group/start", methods=["POST"])
+def supervisor_group_start():
+    name = request.form["name"]
+    task = request.form["task"]
+    program = "{name}_{task}".format(name=name, task=task)
+    rv = supervisor.server.supervisor.startProcessGroup(program)
+    return jsonify(status=rv)
+
+@frontend.route("/ajax/supervisor/stop", methods=["POST"])
 def supervisor_stop():
     name = request.form["name"]
     task = request.form["task"]
@@ -257,5 +265,12 @@ def supervisor_add_config():
     task = request.form["task"]
     program = "{name}_{task}".format(name=name, task=task)
     supervisor.server.supervisor.reloadConfig()
-    rv = supervisor.server.supervisor.addProcessGroup(program)
+    try:
+        rv = supervisor.server.supervisor.addProcessGroup(program)
+    except Exception as e:
+        print e.faultString
+        if e.faultCode == 90:
+            supervisor.server.supervisor.removeProcessGroup(program)
+            rv = supervisor.server.supervisor.addProcessGroup(program)
+
     return jsonify(status=rv)
