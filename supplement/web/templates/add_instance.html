@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+
+{% block content %}
+<div class="panel panel-default">
+  <div class="panel-heading">总任务设置</div>
+  <div class="panel-body">
+    <form class="form-horizontal" role="form" method="POST">
+      <div class="form-group">
+        <label for="tracking_url_1" class="col-sm-2 control-label">请求链接1</label>
+        <div class="col-sm-10">
+          <input type="url" class="form-control" id="tracking_url_1" placeholder="请求链接" name="tracking_url_1">
+          <span class="help-block">必须包含三个参数，%mac%和%ip%和%ts%</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="tracking_url_2" class="col-sm-2 control-label">请求链接2</label>
+        <div class="col-sm-10">
+          <input type="url" class="form-control" id="tracking_url_2" placeholder="请求链接" name="tracking_url_2">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="tracking_url_3" class="col-sm-2 control-label">请求链接1</label>
+        <div class="col-sm-10">
+          <input type="url" class="form-control" id="tracking_url_3" placeholder="请求链接" name="tracking_url_3">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="campaign_name" class="col-sm-2 control-label">投放名称</label>
+        <div class="col-sm-10">
+          <input type="text" class="form-control" id="campaign_name" placeholder="投放名称" name="campaign_name">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="start_date" class="col-sm-2 control-label">开始日期</label>
+        <div class="col-sm-10">
+          <input type="date" class="form-control" id="start_date" placeholder="开始投放的日期" name="start_date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="end_date" class="col-sm-2 control-label">结束日期</label>
+        <div class="col-sm-10">
+          <input type="date" class="form-control" id="end_date" placeholder="结束投放的日期" name="end_date">
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="col-sm-offset-2 col-sm-10">
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script src="http://cdn.staticfile.org/moment.js/2.7.0/moment.min.js"></script>
+<script>
+</script>
+{% endblock %}
