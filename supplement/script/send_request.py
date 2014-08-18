@@ -10,6 +10,9 @@ import json
 import datetime
 import urllib2
 from urllib import urlencode
+import re
+import time
+import random
 
 
 class SendRequestScript(BaseScript):
@@ -37,6 +40,13 @@ class SendRequestScript(BaseScript):
             self.logger.warning("[AllocationScript]: no impression_master")
             return None
 
+        self.url1 = None
+
+        def repl(matchobj):
+            return "{" + matchobj.group(1) + "}"
+
+        self.url1 = re.sub(r"%(\w+)%", repl, self.im.tracking_url_1)
+
         job = self.campaign_paln_queue.reserve(timeout=0)
 
         while job:
@@ -49,24 +59,28 @@ class SendRequestScript(BaseScript):
                 "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
 
             if now_hour > value_now_hour: # 清除这个小时未完成的任务
-                # print "pass"
                 job.delete()
                 job = self.campaign_paln_queue.reserve(timeout=0)
                 continue
 
             if now < value["campaign_date"]:
-                # print "wait", now, value["campaign_date"]
                 self.logger.info("wait") # , now, value["campaign_date"])
                 continue
 
-            url, params = self.im.tracking_url_1, value
+            url1, params = self.url1, value
 
             try:
+                ts = time.time()
+                ts -= random.randint(1500, 1800)
+
                 urllib2.urlopen(
-                    url.format(mac=params["mac_md5"], ip=params["ip"])).read()
+                    url1.format(mac=params["mac_md5"], ip=params["ip"], ts=int(ts))
+                ).read()
+
                 CampaignPlanModel.raw(
                     "UPDATE bl_campaign_plan set status=1 where id={id}".format(id=params["plan_id"])).\
                     execute()
+
             except (urllib2.URLError, urllib2.HTTPError) as e:
                 self.logger.error("send_request error, task: %r, exception: %r" % (params, e))
 
