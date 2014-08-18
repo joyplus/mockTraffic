@@ -48,6 +48,7 @@ class SendRequestScript(BaseScript):
         self.url1 = re.sub(r"%(\w+)%", repl, self.im.tracking_url_1)
 
         job = self.campaign_paln_queue.reserve(timeout=0)
+        url_log_file = open("url-{id}.log".format(id=self.im.id), "a")
 
         while job:
             value = self.json_loads(job.body)
@@ -58,14 +59,14 @@ class SendRequestScript(BaseScript):
             value_now_hour = datetime.datetime(value["campaign_date"].year, value[
                 "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
 
-            if now_hour > value_now_hour: # 清除这个小时未完成的任务
-                job.delete()
-                job = self.campaign_paln_queue.reserve(timeout=0)
-                continue
+            #if now_hour > value_now_hour: # 清除这个小时未完成的任务
+                #job.delete()
+                #job = self.campaign_paln_queue.reserve(timeout=0)
+                #continue
 
-            if now < value["campaign_date"]:
-                self.logger.info("wait") # , now, value["campaign_date"])
-                continue
+            #if now < value["campaign_date"]:
+                #self.logger.info("wait") # , now, value["campaign_date"])
+                #continue
 
             url1, params = self.url1, value
 
@@ -73,8 +74,13 @@ class SendRequestScript(BaseScript):
                 ts = time.time()
                 ts -= random.randint(1500, 1800)
 
+                url = url1.format(mac=params["mac_md5"], ip=params["ip"], ts=int(ts))
+                if config.getboolean("log", "url_record"):
+                    url_log_file.write(url)
+                    url_log_file.write("\n")
+
                 urllib2.urlopen(
-                    url1.format(mac=params["mac_md5"], ip=params["ip"], ts=int(ts))
+                    url
                 ).read()
 
                 CampaignPlanModel.raw(
@@ -88,6 +94,8 @@ class SendRequestScript(BaseScript):
 
             job.delete()
             job = self.campaign_paln_queue.reserve(timeout=0)
+
+        url_log_file.close()
 
 
 
