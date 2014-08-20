@@ -56,7 +56,7 @@ def find_city(city):
     for i in citys:
         if i["region_name"] == city:
             return i
-    return citys[-1]
+    return None
 
 def get_regions():
     return result
