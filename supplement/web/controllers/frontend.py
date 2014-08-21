@@ -57,7 +57,7 @@ def ajax_instance_status(id):
     if DIM.select().where(DIM.impression_master_id==id).count() == 0:
         day_impression_status = False
 
-    if RAM.select().where(RAM.impression_master_id==id).count() != 58:
+    if RAM.select().where(RAM.impression_master_id==id).count() == 0:
         rate_allocation_status = False
 
     return jsonify(day_impression_status=day_impression_status,

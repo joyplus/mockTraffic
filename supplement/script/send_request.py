@@ -59,14 +59,14 @@ class SendRequestScript(BaseScript):
             value_now_hour = datetime.datetime(value["campaign_date"].year, value[
                 "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
 
-            #if now_hour > value_now_hour: # 清除这个小时未完成的任务
-                #job.delete()
-                #job = self.campaign_paln_queue.reserve(timeout=0)
-                #continue
+            if now_hour > value_now_hour: # 清除这个小时未完成的任务
+                job.delete()
+                job = self.campaign_paln_queue.reserve(timeout=0)
+                continue
 
-            #if now < value["campaign_date"]:
-                #self.logger.info("wait") # , now, value["campaign_date"])
-                #continue
+            if now < value["campaign_date"]:
+                self.logger.info("wait") # , now, value["campaign_date"])
+                continue
 
             url1, params = self.url1, value
 
