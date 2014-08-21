@@ -12,7 +12,6 @@ from models.campaign_client import CampaignClientModel
 from models.campaign_plan import CampaignPlanModel
 from script import BaseScript
 import random
-import pdb
 
 
 class AllotPlanScript(BaseScript):
@@ -44,6 +43,13 @@ class AllotPlanScript(BaseScript):
             self.logger.warning("[AllocationScript]: no rate_allocation")
         elif not self.di:
             self.logger.warning("[AllocationScript]: no day_impression")
+
+        # 清除已经有的数据
+        delete_exception = """
+        delete from bl_campaign_plan
+        where impression_master_id={impression_master_id}
+        """
+        CampaignPlanModel.raw(delete_exception.format(impression_master_id=self.im.id)).execute()
 
         # put to redis
         for day in self.di:

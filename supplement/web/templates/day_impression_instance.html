@@ -149,6 +149,16 @@
             <span>总共: <span id="region-rate-number"></span>%</span>
         </div>
         <div class="modal-body">
+            <div>
+                <select id="city-name">
+                </select>
+                <input type="number" step="any" id="city-rate"/>
+                <button type="button" class="btn btn-info" id="city-add">
+                    <i class="fa fa-check  hide"></i>
+                    <i class="fa fa-spinner fa-spin hide"></i>
+                     添加
+                </button>
+            </div>
         <table class="table table-bordered">
             <thead>
                 <tr>
@@ -269,8 +279,9 @@
                     return;
                 }
                 $.each(data, function(key, value) {
+                    if (value[1] > 0) {
                     var tr = $("<tr></tr>");
-                    var td1 = $("<td>" + value[0] + "</td>");
+                    var td1 = $("<td>" + value[2] + "</td>");
                     tr.append(td1);
                     var html = '\
                         <input type="number" step="any" data-id="' + key + '" class="region-rate-mod" value="' + value[1] + '"> \
@@ -284,6 +295,7 @@
                     td2.html(html);
                     tr.append(td2);
                     tr.appendTo($("#region-modal-value"));
+                    }
                 });
                 var total = 0;
                 $.each($("input.region-rate-mod"), function() {
@@ -615,6 +627,56 @@
                     });
             });
         });
+        $.get("/ajax/instance/rate/region/type", function(data) {
+                $.each(data.rv, function(i, e) {
+                    var option = $("<option></option>");
+                    option.text(e.i + " " + e.name);
+                    option.data("code", e.code);
+                    option.data("name", e.name);
+                    option.appendTo($("#city-name"));
+                });
+        });
+        $(document).on("click", "#city-add", function(){
+            var city = $("#city-name  option:selected");
+            var rate = $("#city-rate").val();
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var data = {
+                targeting_code: city.data("code"),
+                rate: rate
+            };
+            $.post("/ajax/instance/rate/region/{{ im.id }}/add", data, function(data) {
+            }).done(function(data){
+                var tbody = $("#region-modal-value");
+                console.log(data);
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+
+                var tr = $("<tr></tr>");
+                var td1 = $("<td>" + city.data("name") + "</td>");
+                tr.append(td1);
+                var html = '\
+                    <input type="number" step="any" data-id="' + "TODO" + '" class="region-rate-mod" value="' + rate + '"> \
+                    <button type="button" class="btn btn-success btn-sm region-rate-mod">\
+                        <i class="fa fa-check  hide"></i>\
+                        <i class="fa fa-spinner fa-spin hide"></i>\
+                        修改\
+                    </button>\
+                '
+                var td2 = $("<td></td>");
+                td2.html(html);
+                tr.append(td2);
+                tr.appendTo($("#region-modal-value"));
+
+                var total = 0;
+                $.each($("input.region-rate-mod"), function() {
+                    total += parseFloat($(this).val());
+                });
+                $("#region-rate-number").text(total);
+            });
+        })
     });
 </script>
 {% endblock %}

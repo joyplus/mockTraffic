@@ -19,16 +19,56 @@
       <div class="form-group">
         <div class="col-sm-offset-2 col-sm-10">
           <button type="submit" class="btn btn-primary">保存</button>
+            {% if type == "clock" %}
+          <button type="button" id="dumps-sample" class="btn btn-success">保存模板</button>
+          <button type="button" id="loads-sample" class="btn btn-warning">加载模板</button>
+            {% endif %}
         </div>
       </div>
     </form>
     </div>
 </div>
+<div id="percent">
+    <span class="label label-danger">0 %</span>
+</div>
 
 {% endblock %}
 
 {% block script %}
-<script src="http://cdn.staticfile.org/moment.js/2.7.0/moment.min.js"></script>
 <script>
+$(function() {
+    $(window).scroll(function() {
+        var y = $(this).scrollTop() + $(this).height() - 100;
+        $("#percent").offset({top: y, left: 30});
+    });
+    $("input[type=number]").focusout(function() {
+        var number = $("input[type=number");
+        var total = 0;
+        $.each(number, function() {
+            total += parseFloat($(this).val());
+        });
+        $("#percent").find("span").text(total + " %");
+    });
+    {% if type == "clock" %}
+    $("#dumps-sample").click(function() {
+        var clock = $("input[type=number]");
+        var clocks = {};
+        $.each(clock, function(i, e) {
+            clocks[$(this).attr("id")] = $(this).val();
+        });
+        store.set("clock-sample", clocks);
+    });
+    $("#loads-sample").click(function() {
+        var clock = $("input[type=number]");
+        var clocks = store.get("clock-sample");
+        var total = 0;
+        $.each(clock, function() {
+            $(this).val(clocks[$(this).attr("id")]);
+            total += parseFloat($(this).val());
+        });
+        $("#percent").find("span").text(total + " %");
+    });
+    {% endif %}
+});
 </script>
 {% endblock %}

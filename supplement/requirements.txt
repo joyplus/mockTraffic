@@ -10,4 +10,5 @@ gevent==1.0.1
 greenlet==0.4.2
 itsdangerous==0.24
 peewee==2.2.5
+pinyin==0.2.5
 redis==2.10.1

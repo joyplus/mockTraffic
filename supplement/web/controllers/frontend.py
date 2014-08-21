@@ -12,6 +12,7 @@ from web.helpers import html5date2py, set_supervisor_config
 from flask import jsonify
 import httplib
 import xmlrpclib
+import pinyin
 
 frontend = Blueprint('simple_page', __name__,
                         template_folder='templates')
@@ -56,7 +57,7 @@ def ajax_instance_status(id):
     if DIM.select().where(DIM.impression_master_id==id).count() == 0:
         day_impression_status = False
 
-    if RAM.select().where(RAM.impression_master_id==id).count() != 58:
+    if RAM.select().where(RAM.impression_master_id==id).count() == 0:
         rate_allocation_status = False
 
     return jsonify(day_impression_status=day_impression_status,
@@ -121,11 +122,18 @@ def day_impression_instance_add(id):
 
 @frontend.route("/ajax/instance/rate/region/<int:id>")
 def rate_region(id):
-    rams = RAM.select().where(RAM.impression_master_id==id,
-                              RAM.type=="region").order_by(RAM.targeting_code);
+    sql = """
+    select t1.id, t1.targeting_code, t1.rate, t2.rate_name from bl_rate_allocation t1
+    left join bl_rate_targeting as t2 on t2.`targeting_code`= t1.targeting_code
+    where impression_master_id = {impression_master_id} and t1.type = "region"
+    """
+
+    #rams = RAM.select().where(RAM.impression_master_id==id,
+                              #RAM.type=="region").order_by(RAM.targeting_code);
+    rams = RAM.raw(sql.format(impression_master_id=id))
     result = dict()
     for i in rams:
-        result[str(i.id)] = [i.targeting_code, i.rate]
+        result[str(i.id)] = [i.targeting_code, i.rate, i.rate_name]
 
     return jsonify(**result)
 
@@ -162,7 +170,8 @@ def rate_region_add(id):
     if request.method == "GET":
         return render_template("rate_region_add.html",
                                config=app.config,
-                               rtm=rtm)
+                               rtm=rtm,
+                               type="region")
 
     for key, value in request.form.items():
         RAM.create(impression_master_id=id,
@@ -171,6 +180,38 @@ def rate_region_add(id):
                    targeting_code=key)
 
     return redirect("/instance/d/%s" % id)
+
+
+@frontend.route("/ajax/instance/rate/region/<int:id>/add", methods=["POST"])
+def rate_region_add_ajax(id):
+    rate = request.form["rate"]
+    targeting_code = request.form["targeting_code"]
+
+    if RAM.select().where(RAM.targeting_code == targeting_code, RAM.impression_master_id == id).exists():
+        ram = RAM.get(RAM.targeting_code == targeting_code, RAM.impression_master_id == id)
+        ram.rate = rate
+        ram.save()
+        return jsonify(status=True)
+
+    RAM.create(type="region",
+               rate=float(rate),
+               targeting_code=targeting_code,
+               impression_master_id=id)
+
+    return jsonify(status=True)
+
+
+@frontend.route("/ajax/instance/rate/region/type")
+def rate_region_all_type():
+    rtms = RTM.select().where(RTM.targeting_type=="city")
+    rv = list()
+    for i in rtms:
+        rv.append(dict(code=i.targeting_code,
+                       name=i.rate_name,
+                       i=pinyin.get_initial(i.rate_name[0]).upper()))
+
+    return jsonify(rv=sorted(rv, key=lambda x: x["i"]))
+
 
 
 @frontend.route("/instance/rate/clock/<int:id>/add", methods=["GET", "POST"])
@@ -183,7 +224,8 @@ def rate_clock_add(id):
     if request.method == "GET":
         return render_template("rate_region_add.html",
                                config=app.config,
-                               rtm=rtm)
+                               rtm=rtm,
+                               type="clock")
 
     for key, value in request.form.items():
         RAM.create(impression_master_id=id,

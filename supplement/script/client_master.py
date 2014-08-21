@@ -13,6 +13,42 @@ import random
 class ClientMaster(BaseScript):
     province_code_total = 32
     gevent_task_nums = 10
+    other_city = {
+        "CN_01": "01",
+        "CN_02": "02",
+        "CN_09": "09",
+        "CN_22": "22",
+        "CN_03": "03_356",
+        "CN_05": "05_357",
+        "CN_06": "06_358",
+        "CN_07": "07_359",
+        "CN_08": "08_360",
+        "CN_10": "10_361",
+        "CN_11": "11_362",
+        "CN_12": "12_363",
+        "CN_13": "13_364",
+        "CN_14": "14_365",
+        "CN_15": "15_366",
+        "CN_16": "16_367",
+        "CN_17": "17_368",
+        "CN_18": "18_369",
+        "CN_19": "19_370",
+        "CN_20": "20_371",
+        "CN_21": "21_372",
+        "CN_23": "23_373",
+        "CN_24": "24_374",
+        "CN_25": "25_375",
+        "CN_26": "26_376",
+        "CN_27": "27_377",
+        "CN_28": "28_378",
+        "CN_29": "29_379",
+        "CN_30": "30_380",
+        "CN_31": "31_381",
+        "CN_32": "32_382",
+        "CN_33": "33_383",
+        "CN_34": "34_384",
+        "CN_04": "04_385",
+    }
 
     def __init__(self, province_code=None, init_total=20000, update_percent=20):
         self.total = init_total
@@ -133,9 +169,12 @@ class ClientMaster(BaseScript):
         if not ip_info["data"]["city"]:
             ip_info["data"]["city"] = ""
         city = find_city(ip_info["data"]["city"])
+        city_code = None
         if not city:
+            city_code = self.other_city[province_code]
+
+        if not city_code:
             return None
-        city_code = city["region_code"]
 
         mac = get_mac()
         mac_md5 = get_mac_md5(mac)

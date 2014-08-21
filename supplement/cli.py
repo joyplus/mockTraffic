@@ -57,7 +57,9 @@ formatter_str = "[{record.level_name} {record.time} {record.module}:{record.line
 info_handler.format_string = formatter_str
 error_handler.format_string = formatter_str
 debug_handler.format_string = formatter_str
+
 set_datetime_format("local")
+
 
 
 if __name__ == '__main__':
@@ -65,22 +67,24 @@ if __name__ == '__main__':
         with debug_handler.applicationbound():
             with info_handler.applicationbound():
                 with error_handler.applicationbound():
-                    start = time()
-                    logger.info("start %s: %s" % (script, start))
+                        start = time()
+                        logger.info("start %s: %s" % (script, start))
 
-                    if not config.getboolean("log", "debug"):
-                        try:
+                        if not config.getboolean("log", "debug"):
+                            try:
+                                main()
+                                logger.info("stop: %s" % time())
+                                exit(11)
+                            except KeyboardInterrupt:
+                                exit(0)
+                                logger.info("stop: %s" % time())
+                            except Exception as e:
+                                logger.error(e)
+                                logger.info("stop: %s" % time())
+                                exit(1)
+                        else:
                             main()
-                            logger.info("stop: %s" % time())
-                            exit(11)
-                        except KeyboardInterrupt:
-                            exit(0)
-                        except Exception as e:
-                            logger.error(e)
-                            exit(1)
-                    else:
-                        main()
 
-                    end = time()
-                    logger.info("stop: %s" % end)
-                    exit(11)
+                        end = time()
+                        logger.info("stop: %s" % end)
+                        exit(11)
