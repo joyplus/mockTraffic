@@ -62,7 +62,7 @@ class PutToQueue(BaseScript):
     def get_campaign_plan(self, id):
         sql = """
         select t1.campaign_date, t1.id as plan_id, t2.* from `bl_campaign_plan`\
-        as t1 left join `bl_client_master` as t2\
+        as t1 left join `bl_client_masters` as t2\
         on t2.id = t1.client_master_id
         where t1.impression_master_id = {im_id} order by t1.campaign_date
         """

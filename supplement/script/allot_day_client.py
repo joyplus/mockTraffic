@@ -60,7 +60,7 @@ class AllotDayClientScript(BaseScript):
                 # 清除异常时的数据
                 delete_exception = """
                 delete t1 from bl_campaign_client as t1
-                left join bl_client_master as t2 on t2.id = t1.client_id
+                left join bl_client_masters as t2 on t2.id = t1.client_id
                 where t1.day_impression_id={day_impression_id} and (t2.province_code="{targeting_code}" or t2.city_code = "{targeting_code}")
                 """
                 CampaignClientModel.raw(delete_exception.format(day_impression_id=day_first.id,
@@ -69,7 +69,6 @@ class AllotDayClientScript(BaseScript):
 
                 for i, per in enumerate(self.client_rate):
                     client_rate_num = nums * float(per) / 100
-                    #impression = round(client_rate_num * i)
                     end = int(round(client_rate_num)) + start
                     for j in client[start:end]:
                         CampaignClientModel(day_impression_id=day_first.id,
@@ -113,69 +112,128 @@ class AllotDayClientScript(BaseScript):
 
                 total_client = day.client
 
-                single_region_sql = """
+                single_region_sql_province = """
                 SELECT count(1) as nums FROM `bl_campaign_client` as t1
-                left join `bl_client_master` as t2
+                left join `bl_client_masters` as t2
                 on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
-                where t2.province_code = "{targeting_code}" or t2.city_code = "{targeting_code}"
+                where t2.province_code = "{targeting_code}"
+                """
+                single_region_sql_city = """
+                SELECT count(1) as nums FROM `bl_campaign_client` as t1
+                left join `bl_client_masters` as t2
+                on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
+                where t2.province_code = "{province_code}" and t2.city_code = "{targeting_code}"
                 """
                 for region in self.region_rate:
                     nums = region.rate * total_client / 100
                     nums = int(round(nums))
-                    single_region_num = CampaignClientModel.raw(single_region_sql.format(day_impression_id=day.id,
+                    if region.targeting_code[:2] == "CN": # 省
+                        single_region_num = CampaignClientModel.raw(single_region_sql_province.format(day_impression_id=day.id,
                                                                                         targeting_code=region.targeting_code)).execute()
+                    else: # city
+                        province_code = "CN_{code}".format(code=region.targeting_code[:2])
+                        single_region_num = CampaignClientModel.raw(single_region_sql_city.format(day_impression_id=day.id,
+                                                                                                  targeting_code=region.targeting_code,
+                                                                                                  province_code=province_code)).execute()
                     single_region_num = single_region_num.next().nums
                     if single_region_num:
                         if nums > single_region_num: # 量不足
                             diff = nums - single_region_num
 
-                            addtion_sql = """
+                            addtion_sql_province = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
-                            where (t1.province_code ="{targeting_code}" or t1.city_code ="{targeting_code}") and t2.id is NULL limit {nums};
+                            where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
+                            """
+                            addtion_sql_city = """
+                            insert into bl_campaign_client(client_id, day_impression_id)
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
+                            left join bl_campaign_client as t2 on t1.id = t2.client_id
+                            where (t1.province_code ="{province_code}" and t1.city_code ="{targeting_code}") and t2.id is NULL limit {nums};
                             """
                             # 补充，TODO 未随机
-                            addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
+                            if region.targeting_code[:2] == "CN": # 省
+                                addtion_clients = ClientMasterModel.raw(addtion_sql_province.format(day_im_id=day.id,
                                                                                     targeting_code=region.targeting_code,
+                                                                                    nums=diff)).execute()
+                            else:
+                                province_code = "CN_{code}".format(code=region.targeting_code[:2])
+                                addtion_clients = ClientMasterModel.raw(addtion_sql_city.format(day_im_id=day.id,
+                                                                                    targeting_code=region.targeting_code,
+                                                                                                province_code=province_code,
                                                                                     nums=diff)).execute()
                         elif nums < single_region_num: # 量过了，不删，plan_impression 为 0 即不使用
                             pass
 
                     else: # 没有此地区，增加
                         if nums > 0:
-                            addtion_sql = """
+                            addtion_sql_province = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
-                            where (t1.province_code ="{targeting_code}" or t2.city_code = "{targeting_code}") and t2.id is NULL limit {nums};
+                            where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
+                            """
+                            addtion_sql_city = """
+                            insert into bl_campaign_client(client_id, day_impression_id)
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
+                            left join bl_campaign_client as t2 on t1.id = t2.client_id
+                            where (t1.province_code ="{province_code}" and t1.city_code ="{targeting_code}") and t2.id is NULL limit {nums};
                             """
                             # 补充，TODO 未随机
-                            addtion_clients = ClientMasterModel.raw(addtion_sql.format(day_im_id=day.id,
+                            if region.targeting_code[:2] == "CN": # 省
+                                addtion_clients = ClientMasterModel.raw(addtion_sql_province.format(day_im_id=day.id,
                                                                                     targeting_code=region.targeting_code,
+                                                                                    nums=nums)).execute()
+                            else:
+                                province_code = "CN_{code}".format(code=region.targeting_code[:2])
+                                addtion_clients = ClientMasterModel.raw(addtion_sql_city.format(day_im_id=day.id,
+                                                                                    targeting_code=region.targeting_code,
+                                                                                                    province_code=province_code,
                                                                                     nums=nums)).execute()
 
         ###### replace 完毕
         self.logger.debug("开始设置剩余天数的频次")
         # 设置剩余天数的 actual_plan_impression
         for day in day_left:
-            region_client_sql = """
+            region_client_sql_province = """
             select t1.* from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
-            where t1.day_impression_id = {day_im_id} and (t2.province_code = "{targeting_code}" or t2.city_code = "{targeting_code}")
+            left join bl_client_masters as t2 on t2.id = t1.client_id
+            where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
             """
-            region_client_count_sql = """
+            region_client_sql_city = """
+            select t1.* from bl_campaign_client as t1
+            left join bl_client_masters as t2 on t2.id = t1.client_id
+            where t1.day_impression_id = {day_im_id} and (t2.province_code = "{province_code}" and t2.city_code = "{targeting_code}")
+            """
+            region_client_count_sql_province = """
             select count(*) as nums from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
-            where t1.day_impression_id = {day_im_id} and (t2.province_code = "{targeting_code}" or t2.city_code = "{targeting_code}")
+            left join bl_client_masters as t2 on t2.id = t1.client_id
+            where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
+            """
+            region_client_count_sql_city = """
+            select count(*) as nums from bl_campaign_client as t1
+            left join bl_client_masters as t2 on t2.id = t1.client_id
+            where t1.day_impression_id = {day_im_id} and (t2.province_code = "{province_code}" or t2.city_code = "{targeting_code}")
             """
             for region in self.region_rate: # 地区的 client
-                clients = CampaignClientModel.raw(region_client_sql.format(day_im_id=day.id,
-                                                                        targeting_code=region.targeting_code)).\
-                    tuples().execute()
-                nums = CampaignClientModel.raw(region_client_count_sql.format(day_im_id=day.id,
-                                                                        targeting_code=region.targeting_code)).\
-                    dicts().execute()
+                if region.targeting_code[:2] == "CN": # 省
+                    clients = CampaignClientModel.raw(region_client_sql_province.format(day_im_id=day.id,
+                                                                            targeting_code=region.targeting_code)).\
+                        tuples().execute()
+                    nums = CampaignClientModel.raw(region_client_count_sql_province.format(day_im_id=day.id,
+                                                                            targeting_code=region.targeting_code)).\
+                        dicts().execute()
+                else:
+                    province_code = "CN_{code}".format(code=region.targeting_code[:2])
+                    clients = CampaignClientModel.raw(region_client_sql_city.format(day_im_id=day.id,
+                                                                                        province_code=province_code,
+                                                                            targeting_code=region.targeting_code)).\
+                        tuples().execute()
+                    nums = CampaignClientModel.raw(region_client_count_sql_city.format(day_im_id=day.id,
+                                                                                        province_code=province_code,
+                                                                            targeting_code=region.targeting_code)).\
+                        dicts().execute()
                 nums = nums.next()["nums"]
                 start = 0
                 end = 0
@@ -188,7 +246,7 @@ class AllotDayClientScript(BaseScript):
                     continue
                 except ExceptionContinueModel.DoesNotExist:
                     handle_exception = """
-                    update bl_campaign_client as t1 left join bl_client_master as t2 on t2.id = t1.client_id
+                    update bl_campaign_client as t1 left join bl_client_masters as t2 on t2.id = t1.client_id
                     set t1.plan_impression = -1, t1.actual_plan_impression = -1
                     where t1.day_impression_id={day_impression_id} and (t2.province_code="{targeting_code}" or t2.city_code="{targeting_code}")
                     """
@@ -300,9 +358,15 @@ class AllotDayClientScript(BaseScript):
 
     def get_clients_by_region(self, targeting_code, nums):
         try:
-            clients = ClientMasterModel.select(ClientMasterModel.id)
-            return targeting_code, clients.where((ClientMasterModel.province_code == targeting_code)|(ClientMasterModel.city_code == targeting_code)).\
-                order_by(fn.Rand()).limit(nums), nums
+            if targeting_code[:2] == "CN": # 省
+                clients = ClientMasterModel.select(ClientMasterModel.id)
+                return targeting_code, clients.where(ClientMasterModel.province_code == targeting_code).\
+                    order_by(fn.Rand()).limit(nums), nums
+            else:
+                province_code = "CN_{code}".format(code=targeting_code[:2])
+                clients = ClientMasterModel.select(ClientMasterModel.id)
+                return targeting_code, clients.where(ClientMasterModel.province_code == province_code, ClientMasterModel.city_code == targeting_code).\
+                    order_by(fn.Rand()).limit(nums), nums
         except Exception as e:
             self.logger.warning(e)
             return None
@@ -326,10 +390,17 @@ class AllotDayClientScript(BaseScript):
 
     def get_client_by_region(self, targeting_code):
         try:
-            client = ClientMasterModel.select().\
-                where((ClientMasterModel.province_code == targeting_code)|(ClientMasterModel.city_code == targeting_code)).\
-                order_by(fn.Rand()).limit(1)
-            return client[0]
+            if targeting_code[:2] == "CN": # 省
+                client = ClientMasterModel.select().\
+                    where(ClientMasterModel.province_code == targeting_code).\
+                    order_by(fn.Rand()).limit(1)
+                return client[0]
+            else:
+                province_code = "CN_{code}".format(code=targeting_code[:2])
+                client = ClientMasterModel.select().\
+                    where(ClientMasterModel.province_code == province_code, ClientMasterModel.city_code == targeting_code).\
+                    order_by(fn.Rand()).limit(1)
+                return client[0]
         except Exception as e:
             self.logger.warning(e)
             return None
