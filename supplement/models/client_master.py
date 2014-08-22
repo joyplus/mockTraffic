@@ -19,4 +19,4 @@ class ClientMasterModel(BaseModel):
         return "<ClientMasterModel: %r>" % self.id
 
     class Meta:
-        db_table = "bl_client_master"
+        db_table = "bl_client_masters"

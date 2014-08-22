@@ -60,7 +60,7 @@ class AllotDayClientScript(BaseScript):
                 # 清除异常时的数据
                 delete_exception = """
                 delete t1 from bl_campaign_client as t1
-                left join bl_client_master as t2 on t2.id = t1.client_id
+                left join bl_client_masters as t2 on t2.id = t1.client_id
                 where t1.day_impression_id={day_impression_id} and (t2.province_code="{targeting_code}" or t2.city_code = "{targeting_code}")
                 """
                 CampaignClientModel.raw(delete_exception.format(day_impression_id=day_first.id,
@@ -114,13 +114,13 @@ class AllotDayClientScript(BaseScript):
 
                 single_region_sql_province = """
                 SELECT count(1) as nums FROM `bl_campaign_client` as t1
-                left join `bl_client_master` as t2
+                left join `bl_client_masters` as t2
                 on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
                 where t2.province_code = "{targeting_code}"
                 """
                 single_region_sql_city = """
                 SELECT count(1) as nums FROM `bl_campaign_client` as t1
-                left join `bl_client_master` as t2
+                left join `bl_client_masters` as t2
                 on t2.id = t1.client_id and t1.day_impression_id = {day_impression_id}
                 where t2.province_code = "{province_code}" and t2.city_code = "{targeting_code}"
                 """
@@ -142,13 +142,13 @@ class AllotDayClientScript(BaseScript):
 
                             addtion_sql_province = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
                             where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
                             """
                             addtion_sql_city = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
                             where (t1.province_code ="{province_code}" and t1.city_code ="{targeting_code}") and t2.id is NULL limit {nums};
                             """
@@ -170,13 +170,13 @@ class AllotDayClientScript(BaseScript):
                         if nums > 0:
                             addtion_sql_province = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
                             where t1.province_code ="{targeting_code}" and t2.id is NULL limit {nums};
                             """
                             addtion_sql_city = """
                             insert into bl_campaign_client(client_id, day_impression_id)
-                            select t1.id, {day_im_id} as day_impression_id from bl_client_master as t1
+                            select t1.id, {day_im_id} as day_impression_id from bl_client_masters as t1
                             left join bl_campaign_client as t2 on t1.id = t2.client_id
                             where (t1.province_code ="{province_code}" and t1.city_code ="{targeting_code}") and t2.id is NULL limit {nums};
                             """
@@ -198,22 +198,22 @@ class AllotDayClientScript(BaseScript):
         for day in day_left:
             region_client_sql_province = """
             select t1.* from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
+            left join bl_client_masters as t2 on t2.id = t1.client_id
             where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
             """
             region_client_sql_city = """
             select t1.* from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
+            left join bl_client_masters as t2 on t2.id = t1.client_id
             where t1.day_impression_id = {day_im_id} and (t2.province_code = "{province_code}" and t2.city_code = "{targeting_code}")
             """
             region_client_count_sql_province = """
             select count(*) as nums from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
+            left join bl_client_masters as t2 on t2.id = t1.client_id
             where t1.day_impression_id = {day_im_id} and t2.province_code = "{targeting_code}"
             """
             region_client_count_sql_city = """
             select count(*) as nums from bl_campaign_client as t1
-            left join bl_client_master as t2 on t2.id = t1.client_id
+            left join bl_client_masters as t2 on t2.id = t1.client_id
             where t1.day_impression_id = {day_im_id} and (t2.province_code = "{province_code}" or t2.city_code = "{targeting_code}")
             """
             for region in self.region_rate: # 地区的 client
@@ -246,7 +246,7 @@ class AllotDayClientScript(BaseScript):
                     continue
                 except ExceptionContinueModel.DoesNotExist:
                     handle_exception = """
-                    update bl_campaign_client as t1 left join bl_client_master as t2 on t2.id = t1.client_id
+                    update bl_campaign_client as t1 left join bl_client_masters as t2 on t2.id = t1.client_id
                     set t1.plan_impression = -1, t1.actual_plan_impression = -1
                     where t1.day_impression_id={day_impression_id} and (t2.province_code="{targeting_code}" or t2.city_code="{targeting_code}")
                     """
@@ -365,7 +365,6 @@ class AllotDayClientScript(BaseScript):
             else:
                 province_code = "CN_{code}".format(code=targeting_code[:2])
                 clients = ClientMasterModel.select(ClientMasterModel.id)
-                print "test", province_code
                 return targeting_code, clients.where(ClientMasterModel.province_code == province_code, ClientMasterModel.city_code == targeting_code).\
                     order_by(fn.Rand()).limit(nums), nums
         except Exception as e:
