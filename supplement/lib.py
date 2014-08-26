@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 import ConfigParser
-from peewee import MySQLDatabase
+from playhouse.pool import PooledMySQLDatabase
 import logging
 import beanstalkc
 from logbook import Logger
@@ -14,14 +14,17 @@ config.readfp(open('config.ini'))
 
 def db():
 
-    _db = MySQLDatabase(database=config.get("database", "name"),
-                        host=config.get("database", "host"),
-                        port=config.getint("database", "port"),
-                        user=config.get("database", "user"),
-                        passwd=config.get("database", "pass"),
-                        charset="utf8",
-                        )
-    _db.connect()
+    _db = PooledMySQLDatabase(
+        database=config.get("database", "name"),
+        max_connections=4,
+        stale_timeout=600,
+        threadlocals=True,
+        host=config.get("database", "host"),
+        port=config.getint("database", "port"),
+        user=config.get("database", "user"),
+        passwd=config.get("database", "pass"),
+        charset="utf8",
+    )
     return _db
 
 
