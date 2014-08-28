@@ -43,6 +43,7 @@ def deliver():
 
 def deploy():
     with settings(warn_only=True):
+        run("rm -rf {code_dir}.backup".format(code_dir=code_dir))
         run("mv {code_dir} {code_dir}.backup".format(code_dir=code_dir))
 
     run("mv /tmp/supplement {code_dir}".format(code_dir=code_dir))
