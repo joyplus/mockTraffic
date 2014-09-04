@@ -87,9 +87,10 @@ class AllotDayClientScript(BaseScript):
         day_left = self.day_im[1:]
         ###### replace start
         try:
-            ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day_left[0].id,
-                                                type="allot_day_client")
-            self.logger.debug("已经分配过了")
+            if day_left:
+                ExceptionContinueModel.get(ExceptionContinueModel.day_impression_id==day_left[0].id,
+                                                    type="allot_day_client")
+                self.logger.debug("已经分配过了")
         except ExceptionContinueModel.DoesNotExist:
             # 清除已经异常时分配的任务
             self.logger.debug("开始分配")
