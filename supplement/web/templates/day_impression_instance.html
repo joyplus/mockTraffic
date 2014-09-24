@@ -7,6 +7,12 @@
                 {{ im.campaign_name }}-每日任务
             </div>
         <div class="pull-right">
+            <input type="number" placeholder="延迟天数" value={{ im.delay_days }} id="delay-days">
+            <button type="button" class="btn btn-success" id="delay-task">
+                <i class="fa fa-check  hide"></i>
+                <i class="fa fa-spinner fa-spin hide"></i>
+                设置
+            </button>
             <div class="btn-group">
                 <button type="button" class="btn btn-primary" id="clock-modal-button">时间比例</button>
                 <button type="button" class="btn btn-primary" id="region-modal-button">地区比例</button>
@@ -677,6 +683,20 @@
                 $("#region-rate-number").text(total);
             });
         })
+        $(document).on('click', '#delay-task', function() {
+            var button = $(this).find("i");
+            button.eq(1).removeClass("hide");
+            var days = $('#delay-days').val() || 0;
+            $.post('/instance/{{ im.id }}/delay_task', {delay_days: days})
+            .done(function(data) {
+                button.eq(1).fadeIn(function() {
+                    button.eq(1).addClass("hide");
+                    button.eq(0).removeClass("hide");
+                });
+            })
+            .fail(function(data) {
+            });
+        });
     });
 </script>
 {% endblock %}

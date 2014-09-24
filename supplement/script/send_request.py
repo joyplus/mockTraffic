@@ -56,6 +56,8 @@ class SendRequestScript(BaseScript):
             now = datetime.datetime.now()
             now_hour = datetime.datetime(
                 now.year, now.month, now.day, now.hour)
+            # days 为正，将来的任务提前到现在，为负，执行以前的任务
+            now_hour += datetime.timedelta(days=self.im.delay_days)
             value_now_hour = datetime.datetime(value["campaign_date"].year, value[
                 "campaign_date"].month, value["campaign_date"].day, value["campaign_date"].hour)
 
@@ -82,9 +84,9 @@ class SendRequestScript(BaseScript):
                     url
                 ).read()
 
-                CampaignPlanModel.raw(
-                    "UPDATE bl_campaign_plan set status=1 where id={id}".format(id=params["plan_id"])).\
-                    execute()
+                #CampaignPlanModel.raw(
+                    #"UPDATE bl_campaign_plan set status=1 where id={id}".format(id=params["plan_id"])).\
+                    #execute()
 
             except (urllib2.URLError, urllib2.HTTPError) as e:
                 self.logger.error("send_request error, task: %r, exception: %r" % (params, e))

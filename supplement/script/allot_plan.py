@@ -44,12 +44,24 @@ class AllotPlanScript(BaseScript):
         elif not self.di:
             self.logger.warning("[AllocationScript]: no day_impression")
 
+
         # 清除已经有的数据
         delete_exception = """
         delete from bl_campaign_plan
         where impression_master_id={impression_master_id}
         """
         CampaignPlanModel.raw(delete_exception.format(impression_master_id=self.im.id)).execute()
+
+        for day in self.di:
+            list_key = "campaign_client:{im_id}:{day_impression_id}".format(im_id=self.im_id,
+                                                                                day_impression_id=day.id)
+            value = self.redis.lpop(self.wrapper_redis_key(list_key))
+            while value:
+                key = "campaign_client:{id}:{day_impression_id}".format(id=value,
+                                                                        day_impression_id=day.id)
+                self.redis.delete(self.wrapper_redis_key(key))
+                value = self.redis.lpop(self.wrapper_redis_key(list_key))
+
 
         # put to redis
         for day in self.di:
@@ -120,6 +132,9 @@ class AllotPlanScript(BaseScript):
 
                     if client["actual_plan_impression"] == 0:
                         self.redis.lrem(self.wrapper_redis_key(list_key), 0, client_id) # 移除 actual_plan_impression 为 0 的
+                        key = "campaign_client:{id}:{day_impression_id}".format(id=client_id,
+                                                                                day_impression_id=day.id)
+                        self.redis.delete(self.wrapper_redis_key(key))
                         continue
 
                     key = "campaign_client:{id}:{day_impression_id}".format(id=client["id"],
@@ -146,6 +161,19 @@ class AllotPlanScript(BaseScript):
 
                 self.logger.debug("end hour:{hour}.".\
                                   format(im_id=self.im_id, day_impression_id=day.id, hour=hour.targeting_code))
+
+
+        for day in self.di:
+            list_key = "campaign_client:{im_id}:{day_impression_id}".format(im_id=self.im_id,
+                                                                                day_impression_id=day.id)
+            value = self.redis.lpop(self.wrapper_redis_key(list_key))
+            while value:
+                key = "campaign_client:{id}:{day_impression_id}".format(id=value,
+                                                                        day_impression_id=day.id)
+                self.redis.delete(self.wrapper_redis_key(key))
+                value = self.redis.lpop(self.wrapper_redis_key(list_key))
+
+
 
 
 

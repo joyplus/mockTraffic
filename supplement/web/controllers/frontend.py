@@ -74,6 +74,15 @@ def instance_list(page):
                            ims=ims,
                            page=page)
 
+@frontend.route('/instance/<int:id>/delay_task', methods=['post'])
+def instance_delay_task(id):
+    im = IMM.get(IMM.id==id)
+    delay_days = request.form['delay_days']
+    im.delay_days = delay_days
+    im.save()
+    return jsonify(status=True)
+
+
 
 @frontend.route("/ajax/instance/d/mod", methods=["POST"])
 def day_impression_instance_mod():

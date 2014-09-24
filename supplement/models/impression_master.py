@@ -18,6 +18,7 @@ class ImpressionMasterModel(BaseModel):
     end_date = DateField()
     total_actual_impression = IntegerField()
     total_actual_client = IntegerField()
+    delay_days = IntegerField()
 
     def __repr__(self):
         return "<ImpressionMasterModel: %r>" % self.id
